@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Signal Field icon</title>
+  <desc id="desc">An original dark circular field with three luminous signal arcs and a central point.</desc>
+  <defs>
+    <radialGradient id="base" cx="50%" cy="42%" r="72%">
+      <stop offset="0" stop-color="#193249"/>
+      <stop offset=".58" stop-color="#0b1624"/>
+      <stop offset="1" stop-color="#050912"/>
+    </radialGradient>
+    <linearGradient id="signal" x1="150" y1="160" x2="850" y2="864" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6ee7d2"/>
+      <stop offset=".48" stop-color="#55b9ff"/>
+      <stop offset="1" stop-color="#9f8cff"/>
+    </linearGradient>
+    <filter id="glow" x="-45%" y="-45%" width="190%" height="190%">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="230" fill="url(#base)"/>
+  <circle cx="512" cy="512" r="374" fill="none" stroke="#9eb9d5" stroke-opacity=".13" stroke-width="3"/>
+  <g fill="none" stroke="url(#signal)" stroke-linecap="round" filter="url(#glow)">
+    <path d="M191 543c94-280 548-326 674-59 89 190-94 349-293 288-176-54-242-227-129-358" stroke-width="43"/>
+    <path d="M263 401c143-162 412-128 501 29 74 130-39 260-190 227-132-29-192-150-116-252" stroke-width="27" stroke-opacity=".88"/>
+    <path d="M335 645c116 110 307 75 372-39 55-95-27-185-131-159-89 23-125 106-78 175" stroke-width="20" stroke-opacity=".72"/>
+  </g>
+  <circle cx="512" cy="512" r="72" fill="#e7fbff"/>
+  <circle cx="512" cy="512" r="45" fill="#55b9ff"/>
+  <circle cx="512" cy="512" r="17" fill="#0b1624"/>
+</svg>

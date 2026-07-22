@@ -1,0 +1,142 @@
+<!doctype html>
+<!-- Signal Field modification notice (2026-07-20). See LICENSE, UPSTREAM_NOTICE.md, and MODIFICATIONS.md. -->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Signal Field</title>
+  <link rel="stylesheet" href="controller.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <h1>Signal Field</h1>
+      <div class="toolbar" role="group" aria-label="transport">
+        <button class="tb lang" id="lang-toggle" type="button" title="中文 / English">EN</button>
+        <button class="tb follow" id="follow-toggle" type="button" aria-pressed="false" data-i18n-title="followTip">跟随系统音频</button>
+        <button class="tb ic" id="btn-play" type="button" data-i18n-title="play" data-i18n-aria="play" title="播放" aria-label="播放">▶</button>
+        <button class="tb ic" id="btn-pause" type="button" data-i18n-title="pause" data-i18n-aria="pause" title="暂停" aria-label="暂停">⏸</button>
+        <button class="tb ic" id="btn-dice" type="button" data-i18n-title="dice" data-i18n-aria="dice" title="随机图形" aria-label="随机图形">🎲</button>
+        <button class="tb ic" id="btn-save" type="button" data-i18n-title="savePat" data-i18n-aria="savePat" title="收藏当前图形" aria-label="收藏当前图形">★</button>
+        <button class="tb ic" id="btn-recall" type="button" data-i18n-title="recallPat" data-i18n-aria="recallPat" title="载入下一个收藏" aria-label="载入下一个收藏">⤴</button>
+        <button class="tb ic" id="show-visualizer" type="button" data-i18n-title="showViz" data-i18n-aria="showViz" title="显示可视化窗口" aria-label="显示可视化窗口">▣</button>
+      </div>
+    </header>
+
+    <section class="panel audio-prompt" id="system-audio-prompt" aria-labelledby="system-audio-prompt-title" hidden>
+      <div class="panel-head">
+        <h2 id="system-audio-prompt-title" data-i18n="systemAudio">系统音频</h2>
+        <div class="transport">
+          <button class="primary" id="start-system" type="button" data-i18n="connectSystem">接入系统音频</button>
+          <button class="ghost compact" id="open-audio-settings" type="button" data-i18n="permissions">权限设置</button>
+        </div>
+      </div>
+      <p class="prompt-copy" data-i18n="promptCopy">首次接入后,这里不再显示音频控制。</p>
+      <p id="capture-status" role="status" aria-live="polite" data-i18n="statusIdle">系统音频 · 未接入</p>
+    </section>
+
+    <section class="panel" aria-labelledby="window-title">
+      <div class="panel-head">
+        <h2 id="window-title" data-i18n="window">窗口</h2>
+        <label class="switch">
+          <input id="always-on-top" type="checkbox" checked>
+          <span data-i18n="pin">置顶</span>
+        </label>
+      </div>
+      <label class="range-row" for="overlay-size">
+        <span data-i18n="size">尺寸</span>
+        <input id="overlay-size" type="range" min="120" max="300" step="10" value="240">
+        <output id="overlay-size-value" for="overlay-size">240</output>
+      </label>
+      <div class="toggle-grid window-toggles">
+        <button class="toggle" id="toggle-fullscreen" type="button" aria-pressed="false" data-i18n="fullscreen">全屏</button>
+        <button class="toggle" id="toggle-transparent" type="button" aria-pressed="false" data-i18n="transparent">透明</button>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="visual-title">
+      <h2 id="visual-title" data-i18n="visual">视觉</h2>
+      <div class="segmented" data-control="style" role="group" aria-label="风格">
+        <button type="button" data-value="sand" class="active" data-i18n="sand">动态声沙</button>
+        <button type="button" data-value="msand" data-i18n="msand">模态声沙</button>
+        <button type="button" data-value="cosmic" data-i18n="cosmic">宇宙网</button>
+        <button type="button" data-value="dcosmic" data-i18n="dcosmic">动态宇宙网</button>
+      </div>
+      <div class="segmented" data-control="sample-mode" role="group" aria-label="采样">
+        <button type="button" data-value="beat" class="active" data-i18n="beat">按拍</button>
+        <button type="button" data-value="time" data-i18n="timed">定时</button>
+      </div>
+      <div class="interval-row" id="pattern-interval-row" hidden>
+        <span data-i18n="interval">定时更新</span>
+        <div class="segmented compact" data-control="pattern-interval-preset" role="group" aria-label="定时更新秒数">
+          <button type="button" data-value="1" data-i18n="sec1">1 秒</button>
+          <button type="button" data-value="2" class="active" data-i18n="sec2">2 秒</button>
+        </div>
+        <input id="pattern-interval" type="number" min="0.25" max="30" step="0.25" value="2" aria-label="pattern 更新间隔秒数">
+        <span data-i18n="secUnit">秒</span>
+      </div>
+      <div class="toggle-grid">
+        <button class="toggle" id="toggle-symmetry" type="button" aria-pressed="false" data-i18n="symmetry">中心对称</button>
+        <button class="toggle" id="toggle-frame" type="button" aria-pressed="false" data-i18n="frame">边框</button>
+      </div>
+      <label class="range-row" for="detail">
+        <span data-i18n="detail">细节</span>
+        <input id="detail" type="range" min="0.55" max="3" step="0.01" value="1.5">
+        <output id="detail-value" for="detail">1.50</output>
+      </label>
+      <label class="range-row" for="particles">
+        <span data-i18n="particles">粒子</span>
+        <input id="particles" type="range" min="0.05" max="1" step="0.01" value="0.15">
+        <output id="particles-value" for="particles">15%</output>
+      </label>
+      <label class="range-row" for="zoom">
+        <span data-i18n="zoom">缩放</span>
+        <input id="zoom" type="range" min="0.25" max="8" step="0.05" value="1">
+        <output id="zoom-value" for="zoom">1.0</output>
+      </label>
+      <label class="range-row" for="evolve">
+        <span data-i18n="evolve">演化</span>
+        <input id="evolve" type="range" min="0.12" max="1" step="0.04" value="0.5">
+        <output id="evolve-value" for="evolve">0.50</output>
+      </label>
+    </section>
+
+    <section class="panel" aria-labelledby="motion-title">
+      <div class="panel-head">
+        <h2 id="motion-title">3D</h2>
+        <button class="toggle active" id="toggle-rotation" type="button" aria-pressed="true" data-i18n="spin">自转</button>
+      </div>
+      <div class="segmented" data-control="rotation-mode" role="group" aria-label="旋转模式">
+        <button type="button" data-value="single" class="active" data-i18n="axis">绕轴</button>
+        <button type="button" data-value="tumble" data-i18n="tumble">翻滚</button>
+        <button type="button" data-value="precess" data-i18n="precess">进动</button>
+      </div>
+      <div class="segmented" data-control="solid-shape" role="group" aria-label="立体形状">
+        <button type="button" data-value="regular" class="active" data-i18n="regular">正 N 面体</button>
+        <button type="button" data-value="random" data-i18n="random">不规则</button>
+      </div>
+      <label class="range-row" for="rotation-speed">
+        <span data-i18n="speed">转速</span>
+        <input id="rotation-speed" type="range" min="0" max="4" step="0.05" value="1">
+        <output id="rotation-speed-value" for="rotation-speed">1.00</output>
+      </label>
+      <label class="range-row" for="faces">
+        <span>N</span>
+        <input id="faces" type="range" min="4" max="32" step="1" value="8">
+        <output id="faces-value" for="faces">8</output>
+      </label>
+      <div class="segmented light-grid" data-control="light" role="group" aria-label="3D 打光">
+        <button type="button" data-value="0" data-i18n="lightDepth">景深</button>
+        <button type="button" data-value="1" data-i18n="lightDim">弱光</button>
+        <button type="button" data-value="2" data-i18n="lightTop">顶光</button>
+        <button type="button" data-value="6" data-i18n="lightPoint">点光源</button>
+        <button type="button" data-value="7" data-i18n="lightRim">轮廓光</button>
+        <button type="button" data-value="8" data-i18n="lightCore">核心光</button>
+        <button type="button" data-value="9" class="active" data-i18n="lightSweep">旋转扫光</button>
+      </div>
+    </section>
+  </main>
+  <script src="controller.js"></script>
+</body>
+</html>

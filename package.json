@@ -1,0 +1,99 @@
+{
+  "name": "signal-field-local",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "signalFieldModificationNotice": "Modified Apache-2.0 upstream files are identified in MODIFICATIONS.md; retain LICENSE and required notices in redistributions.",
+  "author": "Signal Field contributors",
+  "description": "Local audio, data and motion field visualizer.",
+  "homepage": "https://oliveryfaso.github.io/Signal_Chladni_Filed/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Oliveryfaso/Signal_Chladni_Filed.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Oliveryfaso/Signal_Chladni_Filed/issues"
+  },
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "build:pages": "bash scripts/build-pages.sh",
+    "capture:release-media": "electron scripts/capture-release-media.cjs",
+    "capture:media": "npm run capture:release-media",
+    "start:screensaver:mac": "bash scripts/install-mac-screensaver.sh",
+    "smoke": "electron . --smoke",
+    "smoke:screensaver:mac": "bash scripts/verify-mac-screensaver.sh",
+    "check": "node --check desktop/main.cjs && node --check desktop/preload.cjs && node --check desktop/controller.js && node --check app/scene-studio.js && node --check app/scene-studio-ui.js && node --check app/plate-lab-core.js && node --check app/plate-lab-ui.js && node --check app/renderer-capabilities.js && node --check app/renderer-capabilities-ui.js && node --check app/webgpu-particle-backend.js && node --check app/webgpu-integration.js && node --check scripts/verify-scene-studio.cjs && node --check scripts/verify-plate-lab.cjs && node --check scripts/verify-renderer-capabilities.cjs && node --check scripts/verify-webgpu-particle-backend.cjs && node scripts/verify-scene-studio.cjs && node scripts/verify-field-lab.cjs && node scripts/verify-plate-lab.cjs && node scripts/verify-renderer-capabilities.cjs && node scripts/verify-webgpu-particle-backend.cjs && node --check scripts/export-video.cjs && node --check scripts/export-mac-screensaver-assets.cjs && node --check scripts/verify-web-builtin-audio.cjs && node --check scripts/verify-pages.cjs && node --check scripts/capture-release-media.cjs && bash -n scripts/build-pages.sh scripts/package-release.sh",
+    "build:screensaver:mac": "bash scripts/build-mac-screensaver.sh",
+    "install:screensaver:mac": "bash scripts/install-mac-screensaver.sh",
+    "build:lock:mac": "bash scripts/build-mac-lock-launcher.sh",
+    "install:lock:mac": "bash scripts/install-mac-lock-launcher.sh",
+    "lock:mac": "open '/Applications/Signal Field Lock.app'",
+    "export:video": "electron scripts/export-video.cjs",
+    "verify:web-audio": "electron scripts/verify-web-builtin-audio.cjs",
+    "verify:pages": "electron scripts/verify-pages.cjs",
+    "verify:scene-studio": "node scripts/verify-scene-studio.cjs",
+    "verify:plate-lab": "node scripts/verify-plate-lab.cjs",
+    "verify:renderer-capabilities": "node scripts/verify-renderer-capabilities.cjs",
+    "verify:webgpu": "node scripts/verify-webgpu-particle-backend.cjs",
+    "verify:mac-parity": "electron scripts/verify-mac-visual-parity.cjs",
+    "package:mac": "electron-builder --mac --dir --publish never",
+    "package:win": "electron-builder --win --x64 --dir --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:win": "electron-builder --win --x64 --publish never",
+    "release:artifacts": "bash scripts/package-release.sh"
+  },
+  "build": {
+    "appId": "com.signalfield.visualizer",
+    "productName": "Signal Field",
+    "files": [
+      "app/**/*",
+      "desktop/**/*",
+      "!desktop/assets/sound-motion-icon.*",
+      "!desktop/assets/signal-field-icon.iconset/**",
+      "!desktop/assets/signal-field-icon-render/**",
+      "LICENSE",
+      "ASSET_LICENSE.md",
+      "THIRD_PARTY_NOTICES.md",
+      "UPSTREAM_NOTICE.md",
+      "MODIFICATIONS.md",
+      "README.txt",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "desktop/assets/**"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "category": "public.app-category.music",
+      "icon": "desktop/assets/signal-field-icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Signal Field can analyze microphone input when selected.",
+        "NSCameraUsageDescription": "Signal Field requests screen media only to access system audio for visualization.",
+        "NSScreenCaptureUsageDescription": "Signal Field captures screen media to access system audio for visualization.",
+        "NSAudioCaptureUsageDescription": "Signal Field analyzes system audio output to drive the visualizer."
+      }
+    },
+    "win": {
+      "icon": "desktop/assets/signal-field-icon.ico",
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    }
+  },
+  "devDependencies": {
+    "electron": "^42.5.0",
+    "electron-builder": "^26.15.3"
+  }
+}

@@ -1,0 +1,16 @@
+.DS_Store
+node_modules/
+.cache/
+exports/
+dist/
+build/
+.pages/
+.playwright-cli/
+output/
+.ai/
+.npmrc
+.env
+.env.*
+!.env.example
+._*
+*.log
