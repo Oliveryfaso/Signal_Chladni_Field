@@ -1,7 +1,7 @@
 > **修改声明：** 本文档由 Signal Field 贡献者修改；详见 `LICENSE`、`UPSTREAM_NOTICE.md` 与 `MODIFICATIONS.md`。
 
 <p align="center">
-  <a href="https://oliveryfaso.github.io/Signal_Chladni_Filed/"><strong>打开 Signal Field 在线演示</strong></a>
+  <a href="https://oliveryfaso.github.io/Signal_Chladni_Field/"><strong>打开 Signal Field 在线演示</strong></a>
 </p>
 
 <p align="center">
@@ -26,7 +26,7 @@
 
 | 应用 | 状态 | 说明 |
 | --- | --- | --- |
-| Web Demo | [在线演示](https://oliveryfaso.github.io/Signal_Chladni_Filed/) | GitHub Pages 部署，程序生成演示信号驱动动态声沙和动态宇宙网 |
+| Web Demo | [在线演示](https://oliveryfaso.github.io/Signal_Chladni_Field/) | GitHub Pages 部署，程序生成演示信号驱动动态声沙和动态宇宙网 |
 | Mac 音乐可视化应用 | 可从源码构建 | Electron 桌面应用，用户授权后跟随系统音频，支持透明浮层和全屏；不宣称已有公证安装包 |
 | Mac 屏保 / 锁屏动画 | 可从源码构建 | 原生 Metal 实现，可在本机完成构建和安装 |
 | Windows 音乐可视化应用 | 招募贡献者 | 已有跨平台 Electron 与打包基础，尚需完成 Windows 适配、设备测试和正式发布 |
@@ -49,7 +49,7 @@
 
 仓库根目录的 `index.html` 就是发布入口。它复用 `app/index.html` 的真实视觉内核，不维护第二套粒子实现。
 
-**[打开在线 Web Demo](https://oliveryfaso.github.io/Signal_Chladni_Filed/)**
+**[打开在线 Web Demo](https://oliveryfaso.github.io/Signal_Chladni_Field/)**
 
 - 底栏支持中文 / English 即时切换，并记住用户选择。
 - 支持随机图案、全屏、暂停旋转和拖拽观察。

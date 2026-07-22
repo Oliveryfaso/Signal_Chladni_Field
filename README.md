@@ -1,7 +1,7 @@
 > **Modification notice:** This documentation was modified by Signal Field contributors; see `LICENSE`, `UPSTREAM_NOTICE.md`, and `MODIFICATIONS.md`.
 
 <p align="center">
-  <a href="https://oliveryfaso.github.io/Signal_Chladni_Filed/"><strong>Open the live Signal Field demo</strong></a>
+  <a href="https://oliveryfaso.github.io/Signal_Chladni_Field/"><strong>Open the live Signal Field demo</strong></a>
 </p>
 
 <p align="center">
@@ -26,7 +26,7 @@ The repository contains a deployable Web Demo plus source-buildable Mac music vi
 
 | Application | Status | Description |
 | --- | --- | --- |
-| Web Demo | [Live demo](https://oliveryfaso.github.io/Signal_Chladni_Filed/) | GitHub Pages deployment; generated demo signal drives Dynamic Sand and Dynamic Cosmic |
+| Web Demo | [Live demo](https://oliveryfaso.github.io/Signal_Chladni_Field/) | GitHub Pages deployment; generated demo signal drives Dynamic Sand and Dynamic Cosmic |
 | Mac music visualizer | Source build available | Electron app that follows system audio after permission, with overlay and fullscreen modes; no notarized binary is claimed |
 | Mac screen saver / lock animation | Source build available | Native Metal renderer for optimized Modal Sand and Cosmic Web animation; build and install locally |
 | Windows music visualizer | Contributors wanted | Cross-platform Electron and packaging foundations exist; Windows adaptation and device validation remain |
@@ -49,7 +49,7 @@ Each mode remembers its adjusted detail value for the current session. Particle 
 
 The repository-root `index.html` is the publishing entry point. It embeds the real visual engine from `app/index.html`; there is no second particle implementation to maintain.
 
-**[Open the live Web Demo](https://oliveryfaso.github.io/Signal_Chladni_Filed/)**
+**[Open the live Web Demo](https://oliveryfaso.github.io/Signal_Chladni_Field/)**
 
 - Switch the full interface between English and Chinese from the bottom dock.
 - Randomize patterns, enter fullscreen, pause rotation, and drag to inspect the form.

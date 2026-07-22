@@ -6,13 +6,13 @@
   "signalFieldModificationNotice": "Modified Apache-2.0 upstream files are identified in MODIFICATIONS.md; retain LICENSE and required notices in redistributions.",
   "author": "Signal Field contributors",
   "description": "Local audio, data and motion field visualizer.",
-  "homepage": "https://oliveryfaso.github.io/Signal_Chladni_Filed/",
+  "homepage": "https://oliveryfaso.github.io/Signal_Chladni_Field/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Oliveryfaso/Signal_Chladni_Filed.git"
+    "url": "git+https://github.com/Oliveryfaso/Signal_Chladni_Field.git"
   },
   "bugs": {
-    "url": "https://github.com/Oliveryfaso/Signal_Chladni_Filed/issues"
+    "url": "https://github.com/Oliveryfaso/Signal_Chladni_Field/issues"
   },
   "main": "desktop/main.cjs",
   "scripts": {

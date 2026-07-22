@@ -133,7 +133,7 @@ async function main() {
         initial.engineTitle !== 'Signal Field' || initial.engineHeading !== 'Signal Field' || initial.hasLegacyName) {
       throw new Error(`Invalid Pages product name: ${JSON.stringify(initial)}`);
     }
-    if (!initial.canonical.includes('/Signal_Chladni_Filed/') || !initial.sourceLink.includes('/Oliveryfaso/Signal_Chladni_Filed') || !initial.socialImage.includes('/desktop/assets/signal-field-icon.png')) {
+    if (!initial.canonical.includes('/Signal_Chladni_Field/') || !initial.sourceLink.includes('/Oliveryfaso/Signal_Chladni_Field') || !initial.socialImage.includes('/desktop/assets/signal-field-icon.png')) {
       throw new Error(`Pages public metadata/source links are invalid: ${JSON.stringify(initial)}`);
     }
     if (initial.downloadButton) throw new Error('Pages download button is still present');
