@@ -133,7 +133,7 @@ async function main() {
     }
     if (!initial.audio.includes('演示信号')) throw new Error(`Unexpected Pages demo source: ${initial.audio}`);
     if (initial.source !== '/app/index.html' || !initial.dock) throw new Error(`Invalid Pages shell: ${JSON.stringify(initial)}`);
-    if (initial.title !== 'Signal Field — 3D Audio Resonance Visualizer' || !['把一首歌变成 3D 粒子短片','Turn a song into a 3D particle film'].includes(initial.heading) ||
+    if (initial.title !== 'Signal Field — 自动音乐视觉短片创作器' || !['把一首歌变成 3D 粒子短片','Turn a song into a 3D particle film'].includes(initial.heading) ||
         initial.engineTitle !== 'Signal Field' || initial.engineHeading !== 'Signal Field' || initial.hasLegacyName) {
       throw new Error(`Invalid Pages product name: ${JSON.stringify(initial)}`);
     }
@@ -231,15 +231,41 @@ async function main() {
       return {
         title:project.title,scenes:project.scenes.length,keyframes:project.timeline.keyframes.length,durationMs:project.timeline.durationMs,
         source:window.soundMotionTest.state().audioSource,fileLoaded:window.soundMotionTest.state().audioFileLoaded,
-        cueCount:document.querySelectorAll('.director-cue').length,
+        cueCount:document.querySelectorAll('#directorCues .director-cue').length,
         previewDisabled:document.getElementById('directorPreview').disabled,
         exportDisabled:document.getElementById('directorExport').disabled,
-        valid:window.SignalFieldSceneStudio.validateProject(project).valid
+        renderDisabled:document.getElementById('directorRender').disabled,
+        renderMode:document.getElementById('directorRender').dataset.mode,
+        renderText:document.getElementById('directorRender').textContent,
+        renderHint:document.getElementById('directorRenderHint').textContent,
+        finishingHidden:document.getElementById('directorFinishing').hidden,
+        valid:window.SignalFieldSceneStudio.validateProject(project).valid,
+        productionValid:window.SignalFieldProductionSpec.validate(state.productionSpec).valid,
+        beatEdits:state.productionSpec.beatEdits.length
       };
     })()`);
     if (!musicDirection.valid || musicDirection.scenes < 1 || musicDirection.scenes !== musicDirection.keyframes || musicDirection.cueCount !== musicDirection.scenes ||
-      musicDirection.durationMs !== 4000 || musicDirection.source !== 'file' || !musicDirection.fileLoaded || musicDirection.previewDisabled || musicDirection.exportDisabled) {
+      musicDirection.durationMs !== 4000 || musicDirection.source !== 'file' || !musicDirection.fileLoaded || musicDirection.previewDisabled || musicDirection.exportDisabled ||
+      musicDirection.renderDisabled || musicDirection.renderMode !== 'package' || musicDirection.renderText !== '下载创作方案' ||
+      !musicDirection.renderHint.includes('浏览器不会生成 MP4') || !musicDirection.renderHint.includes('音频不会打包') || musicDirection.finishingHidden ||
+      !musicDirection.productionValid || musicDirection.beatEdits < 1) {
       throw new Error(`Music director did not create a usable local project: ${JSON.stringify(musicDirection)}`);
+    }
+    const finishing = await win.webContents.executeJavaScript(`(() => {
+      const lyrics=document.getElementById('directorLyricsText');
+      lyrics.value='[00:00.50]第一行歌词\\n[00:02.00]第二行歌词';
+      lyrics.dispatchEvent(new Event('change',{bubbles:true}));
+      const counts={};
+      const density=document.getElementById('directorBeatDensity');
+      for(const value of ['relaxed','balanced','punchy']){density.value=value;density.dispatchEvent(new Event('change',{bubbles:true}));counts[value]=window.sceneStudioController.state().productionSpec.beatEdits.length;}
+      const spec=window.sceneStudioController.state().productionSpec;
+      const lyric=window.SignalFieldProductionSpec.activeLyricsAt(spec,1000);
+      const frame=window.SignalFieldProductionOverlay.frameState(spec,1000,{reducedMotion:true});
+      return {counts,valid:window.SignalFieldProductionSpec.validate(spec).valid,lyrics:spec.lyrics.length,lyric:lyric&&lyric.text,frameLyric:frame.lyric&&frame.lyric.text,titleVisible:frame.titleVisible,queueChildren:document.getElementById('directorQueue').children.length};
+    })()`);
+    if (!finishing.valid || finishing.lyrics !== 2 || finishing.lyric !== '第一行歌词' || finishing.frameLyric !== '第一行歌词' || !finishing.titleVisible || finishing.queueChildren !== 0 ||
+      !(finishing.counts.punchy > finishing.counts.balanced && finishing.counts.balanced > finishing.counts.relaxed)) {
+      throw new Error(`Production finishing controls are invalid: ${JSON.stringify(finishing)}`);
     }
     await win.webContents.executeJavaScript('document.getElementById("directorPreview").click()');
     await waitFor(win, 'window.sceneStudioController.state().playbackRunning && window.soundMotionTest.state().audioSource==="file" && window.soundMotionTest.state().playing', 'music-synchronised timeline preview');
@@ -318,11 +344,15 @@ async function main() {
         const rect=button.getBoundingClientRect(); return {left:rect.left,right:rect.right,width:rect.width,height:rect.height};
       });
       const directorActions=Array.from(document.querySelectorAll('.director-action')).map(button=>button.getBoundingClientRect().height);
-      return {viewport:innerWidth,documentWidth:document.documentElement.scrollWidth,director:{left:director.left,right:director.right},directorActions,segment:{left:segmentRect.left,right:segmentRect.right,width:segmentRect.width},buttons};
+      const finishing=document.getElementById('directorFinishing').getBoundingClientRect();
+      const finishingControls=Array.from(document.querySelectorAll('#directorFinishing input,#directorFinishing select,#directorFinishing button,#directorRender')).filter(el=>!el.hidden).map(el=>{const rect=el.getBoundingClientRect();return {height:rect.height,left:rect.left,right:rect.right};});
+      return {viewport:innerWidth,documentWidth:document.documentElement.scrollWidth,director:{left:director.left,right:director.right},finishing:{left:finishing.left,right:finishing.right},finishingControls,directorActions,segment:{left:segmentRect.left,right:segmentRect.right,width:segmentRect.width},buttons};
     })()`);
     if (mobileShapeControl.segment.left < 0 || mobileShapeControl.segment.right > mobileShapeControl.viewport + 0.5 ||
       mobileShapeControl.documentWidth > mobileShapeControl.viewport + 1 || mobileShapeControl.director.left < 0 || mobileShapeControl.director.right > mobileShapeControl.viewport + 0.5 ||
-      mobileShapeControl.directorActions.some((height) => height < 44) || mobileShapeControl.buttons.some((button) => button.width <= 0 || button.height < 44 || button.left < mobileShapeControl.segment.left - 0.5 || button.right > mobileShapeControl.segment.right + 0.5)) {
+      mobileShapeControl.finishing.left < 0 || mobileShapeControl.finishing.right > mobileShapeControl.viewport + 0.5 ||
+      mobileShapeControl.directorActions.some((height) => height < 44) || mobileShapeControl.finishingControls.some((control) => control.height < 44 || control.left < 0 || control.right > mobileShapeControl.viewport + 0.5) ||
+      mobileShapeControl.buttons.some((button) => button.width <= 0 || button.height < 44 || button.left < mobileShapeControl.segment.left - 0.5 || button.right > mobileShapeControl.segment.right + 0.5)) {
       throw new Error(`GPU shape selector overflows its mobile surface: ${JSON.stringify(mobileShapeControl)}`);
     }
     win.setContentSize(1280, 800);
@@ -351,7 +381,7 @@ async function main() {
     const redirect = await win.webContents.executeJavaScript('({path:location.pathname,search:location.search,hash:location.hash})');
     if (redirect.search !== '?source=legacy' || redirect.hash !== '#demo') throw new Error(`Legacy redirect lost URL state: ${JSON.stringify(redirect)}`);
     if (errors.length) throw new Error(`Browser console errors: ${errors.join(' | ')}`);
-    console.log('PASS creator entry, local music analysis, automatic Scene Studio direction, music-synchronised preview, mobile creator layout, Plate Lab defaults, GPU regular/random/sphere boundaries, per-style GPU mechanics, truthful WebGPU/Canvas runtime status, parity Canvas lock, bilingual UI, licenses, and /website/ redirect');
+    console.log('PASS creator entry, local music analysis, automatic Scene Studio direction, title/LRC/beat production spec, honest Web render-package fallback, music-synchronised overlay preview, mobile finishing layout, Plate Lab defaults, GPU regular/random/sphere boundaries, per-style GPU mechanics, truthful WebGPU/Canvas runtime status, parity Canvas lock, bilingual UI, licenses, and /website/ redirect');
   } finally {
     if (!win.isDestroyed()) win.destroy();
     await new Promise((resolve) => server.close(resolve));

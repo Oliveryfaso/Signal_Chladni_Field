@@ -12,6 +12,9 @@
 
   const Studio = window.SignalFieldSceneStudio;
   const Director = window.SignalFieldMusicDirector;
+  const Production = window.SignalFieldProductionSpec;
+  const ProductionOverlay = window.SignalFieldProductionOverlay;
+  const Desktop = window.soundMotionDesktop;
   const target = window.soundMotionNative;
   const testApi = window.soundMotionTest;
   const root = document.getElementById('sceneStudio');
@@ -41,6 +44,22 @@
   const directorExport = document.getElementById('directorExport');
   const directorStatus = document.getElementById('directorStatus');
   const directorCues = document.getElementById('directorCues');
+  const directorFinishing = document.getElementById('directorFinishing');
+  const directorTitleTemplate = document.getElementById('directorTitleTemplate');
+  const directorTitleText = document.getElementById('directorTitleText');
+  const directorSubtitleText = document.getElementById('directorSubtitleText');
+  const directorLyricsText = document.getElementById('directorLyricsText');
+  const directorLyricsFile = document.getElementById('directorLyricsFile');
+  const directorLyricsClear = document.getElementById('directorLyricsClear');
+  const directorLyricsStatus = document.getElementById('directorLyricsStatus');
+  const directorBeatDensity = document.getElementById('directorBeatDensity');
+  const directorBeatSummary = document.getElementById('directorBeatSummary');
+  const directorBeatCues = document.getElementById('directorBeatCues');
+  const directorRender = document.getElementById('directorRender');
+  const directorRenderHint = document.getElementById('directorRenderHint');
+  const directorQueue = document.getElementById('directorQueue');
+  const directorQueueStatus = document.getElementById('directorQueueStatus');
+  const productionCanvas = document.getElementById('video-overlay-canvas');
 
   let store = Studio.createStore(Studio.createProject({
     title: '我的 Signal Field 项目',
@@ -58,6 +77,10 @@
   let musicFile = null;
   let musicMeta = null;
   let directionPlan = null;
+  let directionAnalysis = null;
+  let productionSpec = null;
+  let parsedLyrics = [];
+  const renderTasks = new Map();
   let directionGeneration = 0;
   let selectedTemplate = 'ambient-orbit';
   let selectedAspect = '16:9';
@@ -92,6 +115,151 @@
     const minutes = Math.floor(totalTenths / 600);
     const seconds = Math.floor((totalTenths % 600) / 10);
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${totalTenths % 10}`;
+  }
+
+  function safeOutputBase(value) {
+    return String(value || 'signal-field-video').replace(/\.[^.]+$/, '').replace(/[^\w\u4e00-\u9fff-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 120) || 'signal-field-video';
+  }
+
+  function parseLrc(serialized, durationMs) {
+    const rows = [];
+    const metadata = /^\[(ar|ti|al|by|offset):/i;
+    String(serialized || '').split(/\r?\n/).forEach((line, lineIndex) => {
+      const trimmed = line.trim();
+      if (!trimmed || metadata.test(trimmed)) return;
+      const match = trimmed.match(/^\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]\s*(.+)$/);
+      if (!match) throw new Error(`第 ${lineIndex + 1} 行缺少 [分钟:秒.毫秒] 时间戳`);
+      const fraction = match[3] ? Number(`0.${match[3]}`) : 0;
+      const startMs = Math.round((Number(match[1]) * 60 + Number(match[2]) + fraction) * 1000);
+      if (startMs < 0 || startMs >= durationMs) throw new Error(`第 ${lineIndex + 1} 行时间超出短片范围`);
+      if (rows.length && startMs <= rows[rows.length - 1].startMs) throw new Error('歌词时间戳必须严格递增且不能重复');
+      rows.push({ startMs, text: match[4].trim() });
+    });
+    return rows.map((cue, index) => {
+      const next = rows[index + 1];
+      const endMs = Math.min(durationMs, next ? next.startMs : cue.startMs + 5000, cue.startMs + 8000);
+      if (endMs <= cue.startMs) throw new Error('歌词时间区间无效');
+      return { startMs: cue.startMs, endMs, text: cue.text };
+    });
+  }
+
+  function beatEditsForCurrentProject() {
+    if (!directionPlan || !directionAnalysis) return [];
+    const project = store.getProject();
+    const durationMs = project.timeline.durationMs;
+    const scenes = project.scenes;
+    if (!durationMs || !scenes.length) return [];
+    const tempo = directionAnalysis.tempo || {};
+    const density = directorBeatDensity ? directorBeatDensity.value : 'balanced';
+    const multipliers = { relaxed: 4, balanced: 2, punchy: 1 };
+    const edits = [];
+    if (tempo.confidence >= 0.25 && tempo.beatMs > 0) {
+      const interval = tempo.beatMs * multipliers[density];
+      for (let time = interval; time < durationMs && edits.length < 2000; time += interval) {
+        const index = edits.length;
+        const scene = scenes[Math.min(scenes.length - 1, Math.floor((time / durationMs) * scenes.length))];
+        const hardCut = density === 'relaxed' || index % (density === 'punchy' ? 4 : 2) === 0;
+        edits.push({
+          timeMs: Math.round(time),
+          action: hardCut ? 'cut' : 'accent',
+          intensity: hardCut ? 0.75 : (density === 'punchy' ? 0.9 : 0.55),
+          targetSceneId: hardCut ? scene.id : null
+        });
+      }
+    } else {
+      directionPlan.cues.slice(1).forEach((cue, index) => {
+        if (cue.timeMs >= durationMs) return;
+        const scene = scenes[Math.min(scenes.length - 1, index + 1)];
+        edits.push({ timeMs: Math.round(cue.timeMs), action: 'cut', intensity: 0.65, targetSceneId: scene.id });
+      });
+    }
+    return edits;
+  }
+
+  function renderBeatSummary(edits) {
+    if (!directorBeatSummary || !directorBeatCues) return;
+    const tempo = directionAnalysis && directionAnalysis.tempo;
+    const cuts = edits.filter((edit) => edit.action === 'cut').length;
+    const accents = edits.filter((edit) => edit.action === 'accent').length;
+    directorBeatSummary.textContent = tempo && tempo.confidence >= 0.25
+      ? `${Math.round(tempo.bpm)} BPM · ${cuts} 个硬切 · ${accents} 个强调`
+      : `自由节奏 · ${cuts} 个段落切点`;
+    directorBeatCues.innerHTML = '';
+    edits.slice(0, 12).forEach((edit) => {
+      const chip = document.createElement('span');
+      chip.className = 'director-cue';
+      chip.textContent = `${formatTime(edit.timeMs)} · ${edit.action === 'cut' ? '切' : '强调'}`;
+      directorBeatCues.appendChild(chip);
+    });
+    if (edits.length > 12) {
+      const more = document.createElement('span'); more.className = 'director-cue'; more.textContent = `＋${edits.length - 12}`; directorBeatCues.appendChild(more);
+    }
+  }
+
+  function buildProductionSpec(options) {
+    if (!Production || !directionPlan) return null;
+    const template = directorTitleTemplate.value;
+    const codec = options && options.codec === 'prores' ? 'prores' : 'h264';
+    const base = safeOutputBase(directorTitleText.value || (musicMeta && musicMeta.name));
+    const edits = beatEditsForCurrentProject();
+    const spec = Production.create({
+      project: store.getProject(),
+      aspect: selectedAspect,
+      titleCard: {
+        template,
+        mainTitle: directorTitleText.value.trim(),
+        subtitle: directorSubtitleText.value.trim()
+      },
+      lyrics: parsedLyrics,
+      beatEdits: edits,
+      output: { codec, fileName: `${base}.${codec === 'prores' ? 'mov' : 'mp4'}` }
+    });
+    productionSpec = spec;
+    renderBeatSummary(edits);
+    return spec;
+  }
+
+  function updateProductionSpec() {
+    if (!directionPlan || !Production) return null;
+    try {
+      const spec = buildProductionSpec();
+      directorRender.disabled = false;
+      drawProductionOverlay(Number(timeline.value) || 0);
+      return spec;
+    } catch (error) {
+      directorRender.disabled = true;
+      setDirectorStatus(`成片设置无效：${error.message || error}`, true);
+      return null;
+    }
+  }
+
+  function productionSnapshot(timeMs, fallback) {
+    if (!productionSpec || !productionSpec.beatEdits.length) return fallback;
+    let cut = null;
+    for (const edit of productionSpec.beatEdits) {
+      if (edit.timeMs > timeMs) break;
+      if (edit.action === 'cut' && edit.targetSceneId) cut = edit;
+    }
+    if (!cut) return fallback;
+    const nextKeyframe = store.getProject().timeline.keyframes.find((keyframe) => keyframe.timeMs > cut.timeMs);
+    if (nextKeyframe && timeMs >= nextKeyframe.timeMs) return fallback;
+    const scene = store.getProject().scenes.find((candidate) => candidate.id === cut.targetSceneId);
+    return scene ? scene.snapshot : fallback;
+  }
+
+  function drawProductionOverlay(timeMs) {
+    if (!productionCanvas || !ProductionOverlay) return;
+    if (!productionSpec) { ProductionOverlay.clearOverlay(productionCanvas); return; }
+    const bounds = productionCanvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const pixelWidth = Math.max(1, Math.round(bounds.width * dpr));
+    const pixelHeight = Math.max(1, Math.round(bounds.height * dpr));
+    if (productionCanvas.width !== pixelWidth) productionCanvas.width = pixelWidth;
+    if (productionCanvas.height !== pixelHeight) productionCanvas.height = pixelHeight;
+    ProductionOverlay.drawOverlay(productionCanvas, productionSpec, timeMs, {
+      width: Math.max(1, bounds.width), height: Math.max(1, bounds.height), dpr,
+      reducedMotion: window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    });
   }
 
   function captureSnapshot() {
@@ -335,7 +503,9 @@
     const result = store.seek(milliseconds);
     timeline.value = String(result.timeMs);
     updateTimeLabel();
-    if (result.snapshot) applySnapshot(result.snapshot, force);
+    const snapshot = productionSnapshot(result.timeMs, result.snapshot);
+    if (snapshot) applySnapshot(snapshot, force);
+    drawProductionOverlay(result.timeMs);
     return result;
   }
 
@@ -397,6 +567,7 @@
     playbackUsingFile = false;
     previousSource = null;
     lastAppliedSnapshot = null;
+    drawProductionOverlay(Number(timeline.value) || 0);
     if (wasRunning && !keepPosition) setStatus('时间线已停止');
   }
 
@@ -479,6 +650,8 @@
     if (!Director || !musicFile || !musicMeta) return;
     const generation = ++directionGeneration;
     const previousPlan = directionPlan;
+    const previousAnalysis = directionAnalysis;
+    const previousProduction = productionSpec;
     directorGenerate.disabled = true;
     directorPreview.disabled = true;
     directorExport.disabled = true;
@@ -504,23 +677,32 @@
       stopPlayback(false);
       store.importJSON(Studio.exportProject(canonical));
       directionPlan = Object.assign({}, plan, { project: store.getProject() });
+      directionAnalysis = analysis;
+      productionSpec = null;
       selectedId = directionPlan.project.scenes[0] ? directionPlan.project.scenes[0].id : null;
       timeline.value = '0';
       persist();
       render();
       if (directionPlan.project.timeline.keyframes[0]) seekAndApply(0, true);
       renderDirectionCues(directionPlan);
+      if (!directorTitleText.value.trim()) directorTitleText.value = musicMeta.name.replace(/\.[^.]+$/, '');
+      directorFinishing.hidden = false;
+      directorFinishing.open = true;
+      updateProductionSpec();
       const tempo = analysis.tempo.confidence >= 0.25 ? `${Math.round(analysis.tempo.bpm)} BPM` : '自由节奏';
       setDirectorStatus(`已生成 ${directionPlan.project.scenes.length} 个段落 · ${tempo} · ${selectedAspect} · 可直接预览或继续编辑`);
     } catch (error) {
       if (error && error.message === 'analysis-cancelled') return;
       directionPlan = previousPlan;
+      directionAnalysis = previousAnalysis;
+      productionSpec = previousProduction;
       setDirectorStatus(`生成失败：${error.message || '无法分析这个文件'}。原有项目已保留。`, true);
     } finally {
       if (generation === directionGeneration) {
         directorGenerate.disabled = !musicFile;
         directorPreview.disabled = !directionPlan;
         directorExport.disabled = !directionPlan;
+        directorRender.disabled = !productionSpec;
       }
     }
   }
@@ -537,10 +719,18 @@
     if (!file) return;
     const token = ++directionGeneration;
     directionPlan = null;
+    directionAnalysis = null;
+    productionSpec = null;
+    parsedLyrics = [];
+    if (directorFinishing) directorFinishing.hidden = true;
+    if (directorLyricsText) directorLyricsText.value = '';
+    if (directorTitleText) directorTitleText.value = '';
+    if (productionCanvas && ProductionOverlay) ProductionOverlay.clearOverlay(productionCanvas);
     directorCues.innerHTML = '';
     directorGenerate.disabled = true;
     directorPreview.disabled = true;
     directorExport.disabled = true;
+    directorRender.disabled = true;
     directorFileName.textContent = `${file.name} · 正在读取…`;
     setDirectorStatus('正在读取音频元数据；文件不会离开这台设备。');
     try {
@@ -558,6 +748,106 @@
       setDirectorStatus('无法读取这个音频文件，请换用浏览器支持的 MP3、M4A、WAV 或 OGG。', true);
     } finally {
       directorFileInput.value = '';
+    }
+  }
+
+  function downloadProductionSpec() {
+    const spec = updateProductionSpec();
+    if (!spec) return;
+    const blob = new Blob([Production.export(spec)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${safeOutputBase(spec.titleCard.mainTitle || store.getProject().title)}-production.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    setDirectorStatus('已下载创作方案。音频不会打包；请在桌面版重新选择同一文件后渲染。');
+  }
+
+  function ingestLyrics(serialized) {
+    const durationMs = store.getProject().timeline.durationMs;
+    const next = parseLrc(serialized, durationMs);
+    const previous = parsedLyrics;
+    parsedLyrics = next;
+    try {
+      updateProductionSpec();
+      directorLyricsStatus.textContent = next.length ? `已读取 ${next.length} 条时间戳歌词。` : '未添加歌词；最终视频只显示标题。';
+      directorLyricsStatus.setAttribute('role', 'status');
+    } catch (error) {
+      parsedLyrics = previous;
+      updateProductionSpec();
+      throw error;
+    }
+  }
+
+  function setLyricsError(error) {
+    directorLyricsStatus.textContent = `歌词未更新：${error.message || error}`;
+    directorLyricsStatus.setAttribute('role', 'alert');
+  }
+
+  function renderQueueTask(task) {
+    if (!task || !task.id) return;
+    renderTasks.set(task.id, task);
+    const labels = { queued: '等待中', running: '正在渲染', completed: '已完成', failed: '失败', cancelled: '已取消' };
+    directorQueue.innerHTML = '';
+    Array.from(renderTasks.values()).slice(-8).reverse().forEach((item) => {
+      const card = document.createElement('article');
+      card.className = 'director-queue-item'; card.setAttribute('role', 'listitem'); card.dataset.status = item.status;
+      const copy = document.createElement('div');
+      const name = document.createElement('b');
+      name.textContent = String(item.output || '视频任务').split(/[\\/]/).pop();
+      const detail = document.createElement('span');
+      const percent = Math.round((Number(item.progress) || 0) * 100);
+      detail.textContent = `${labels[item.status] || item.status}${item.status === 'running' ? ` · ${percent}%` : ''}${item.error ? ` · ${String(item.error).slice(0, 180)}` : ''}`;
+      copy.append(name, detail); card.appendChild(copy);
+      if (item.status === 'queued' || item.status === 'running') {
+        const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = '取消';
+        cancel.addEventListener('click', async () => {
+          try { renderQueueTask(await Desktop.cancelRender(item.id)); } catch (error) { directorQueueStatus.textContent = `取消失败：${error.message || error}`; }
+        });
+        card.appendChild(cancel);
+      }
+      directorQueue.appendChild(card);
+    });
+    directorQueueStatus.textContent = task.status === 'completed' ? '视频已经生成。' : task.status === 'failed' ? '渲染失败；当前创作方案仍然保留。' : '桌面渲染队列会串行处理任务。';
+  }
+
+  async function renderOrDownload() {
+    const spec = updateProductionSpec();
+    if (!spec) return;
+    if (directorRender.dataset.mode !== 'desktop') { downloadProductionSpec(); return; }
+    directorRender.disabled = true;
+    directorQueueStatus.textContent = '正在选择输出位置并创建任务…';
+    try {
+      const audioFilePath = Desktop.pathForFile(musicFile);
+      if (!audioFilePath) throw new Error('无法取得本地音频路径，请重新选择音乐');
+      const task = await Desktop.enqueueProduction({
+        productionJson: Production.export(spec, { pretty: false }),
+        audioFilePath,
+        aspect: spec.aspect,
+        codec: spec.output.codec,
+        fileName: spec.output.fileName
+      });
+      if (!task) { directorQueueStatus.textContent = '已取消选择输出位置。'; return; }
+      renderQueueTask(task);
+    } catch (error) {
+      directorQueueStatus.textContent = `未加入队列：${error.message || error}`;
+      directorQueueStatus.setAttribute('role', 'alert');
+    } finally {
+      directorRender.disabled = !productionSpec;
+    }
+  }
+
+  function configureRenderMode() {
+    const desktop = Boolean(Desktop && typeof Desktop.enqueueProduction === 'function' && typeof Desktop.pathForFile === 'function');
+    directorRender.dataset.mode = desktop ? 'desktop' : 'package';
+    directorRender.textContent = desktop ? '一键渲染视频' : '下载创作方案';
+    directorRenderHint.textContent = desktop
+      ? '选择保存位置后加入本机串行队列；关闭网页不会把音乐上传到任何服务器。'
+      : '浏览器不会生成 MP4；音频不会打包，请在桌面版重新选择同一文件后渲染。';
+    if (desktop && typeof Desktop.listRenders === 'function') {
+      Desktop.listRenders().then((tasks) => tasks.forEach(renderQueueTask)).catch(() => {});
+      if (typeof Desktop.onRenderQueueChange === 'function') Desktop.onRenderQueueChange(renderQueueTask);
     }
   }
 
@@ -596,6 +886,28 @@
     });
     directorGenerate.addEventListener('click', generateDirection);
     directorPreview.addEventListener('click', () => { startPlayback(); });
+    directorTitleTemplate.addEventListener('change', updateProductionSpec);
+    directorTitleText.addEventListener('input', updateProductionSpec);
+    directorSubtitleText.addEventListener('input', updateProductionSpec);
+    directorBeatDensity.addEventListener('change', updateProductionSpec);
+    directorLyricsText.addEventListener('change', () => {
+      try { ingestLyrics(directorLyricsText.value); } catch (error) { setLyricsError(error); }
+    });
+    directorLyricsFile.addEventListener('change', async () => {
+      const file = directorLyricsFile.files[0];
+      if (!file) return;
+      try {
+        if (file.size > 2 * 1024 * 1024) throw new Error('LRC 文件不能超过 2 MB');
+        const text = await file.text();
+        ingestLyrics(text); directorLyricsText.value = text;
+      } catch (error) { setLyricsError(error); }
+      finally { directorLyricsFile.value = ''; }
+    });
+    directorLyricsClear.addEventListener('click', () => {
+      parsedLyrics = []; directorLyricsText.value = ''; updateProductionSpec();
+      directorLyricsStatus.textContent = '歌词已清空；最终视频只显示标题。'; directorLyricsStatus.setAttribute('role', 'status');
+    });
+    directorRender.addEventListener('click', renderOrDownload);
     directorExport.addEventListener('click', () => {
       exportProject();
       setDirectorStatus(`已下载可编辑场景项目。桌面高质量视频可用 --project 与 --aspect ${selectedAspect} 导出。`);
@@ -608,6 +920,8 @@
       directorGenerate.disabled = false;
       setDirectorStatus('音乐已就绪。选择模板和画幅后，点击“分析并生成”。');
     });
+    window.addEventListener('resize', () => drawProductionOverlay(Number(timeline.value) || 0));
+    configureRenderMode();
   }
 
   safeLoad();
@@ -623,11 +937,12 @@
     stop: () => stopPlayback(true),
     generateMusicPlan: generateDirection,
     exportJSON: () => store.exportJSON(),
+    exportProductionJSON: () => productionSpec && Production ? Production.export(productionSpec) : null,
     importJSON(serialized) {
       const result = store.tryImportJSON(serialized);
       if (result.ok) { selectedId = result.project.scenes[0] ? result.project.scenes[0].id : null; persist(); render(); }
       return result;
     },
-    state: () => ({ project: store.getProject(), selectedId, playbackRunning })
+    state: () => ({ project: store.getProject(), selectedId, playbackRunning, productionSpec, renderTasks: Array.from(renderTasks.values()) })
   };
 }());

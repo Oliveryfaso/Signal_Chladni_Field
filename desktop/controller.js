@@ -39,6 +39,7 @@
       permissions: '权限设置', promptCopy: '首次接入后,这里不再显示音频控制。',
       followTip: '跟随系统音频', play: '播放', pause: '暂停', showViz: '显示可视化窗口',
       follow: '跟随系统音频', unfollow: '取消跟随',
+      openCreator: '打开音乐视频创作工作台',
       audioName: '系统音频', notConnected: '未接入', unavailable: '当前环境不可用', requesting: '请求权限',
       noTrack: '未获得音频轨道，检查权限', capturing: '正在捕获', waiting: '已接入，等待系统声音', stopped: '已停止'
     },
@@ -53,6 +54,7 @@
       permissions: 'Permissions', promptCopy: 'Hidden after the first connect.',
       followTip: 'Follow system audio', play: 'Play', pause: 'Pause', showViz: 'Show Visualizer',
       follow: 'Follow Audio', unfollow: 'Unfollow',
+      openCreator: 'Open Music Video Creator',
       audioName: 'System Audio', notConnected: 'Not connected', unavailable: 'Unavailable here', requesting: 'Requesting permission',
       noTrack: 'No audio track, check permission', capturing: 'Capturing', waiting: 'Connected, waiting for sound', stopped: 'Stopped'
     }
@@ -473,6 +475,7 @@
     hydrateState().catch(() => {});
 
     document.getElementById('show-visualizer').addEventListener('click', () => api.showVisualizer());
+    document.getElementById('show-creator').addEventListener('click', () => api.showCreator());
     document.getElementById('btn-dice').addEventListener('click', () => visualizerCall('randomizePattern'));
     document.getElementById('btn-save').addEventListener('click', () => visualizerCall('savePattern'));
     document.getElementById('btn-recall').addEventListener('click', () => visualizerCall('cyclePattern', [1]));

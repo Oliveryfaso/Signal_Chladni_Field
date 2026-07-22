@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('soundMotionDesktop', {
   getState: () => ipcRenderer.invoke('sound-motion:get-state'),
@@ -10,6 +10,19 @@ contextBridge.exposeInMainWorld('soundMotionDesktop', {
   setVisualizerBounds: (next) => ipcRenderer.invoke('sound-motion:set-visualizer-bounds', next),
   showVisualizer: () => ipcRenderer.invoke('sound-motion:show-visualizer'),
   hideVisualizer: () => ipcRenderer.invoke('sound-motion:hide-visualizer'),
+  showCreator: () => ipcRenderer.invoke('sound-motion:show-creator'),
+  pathForFile: (file) => webUtils.getPathForFile(file),
+  chooseRenderOutput: (options) => ipcRenderer.invoke('sound-motion:choose-render-output', options),
+  enqueueProduction: (options) => ipcRenderer.invoke('sound-motion:enqueue-production', options),
+  enqueueRender: (task) => ipcRenderer.invoke('sound-motion:render-queue-enqueue', task),
+  listRenders: () => ipcRenderer.invoke('sound-motion:render-queue-list'),
+  cancelRender: (id) => ipcRenderer.invoke('sound-motion:render-queue-cancel', id),
+  onRenderQueueChange: (handler) => {
+    if (typeof handler !== 'function') throw new TypeError('render queue handler must be a function');
+    const listener = (_event, task) => handler(task);
+    ipcRenderer.on('sound-motion:render-queue-changed', listener);
+    return () => ipcRenderer.removeListener('sound-motion:render-queue-changed', listener);
+  },
   openSystemAudioSettings: () => ipcRenderer.invoke('sound-motion:open-system-audio-settings'),
   setVisualizerFullScreen: (fullScreen) => ipcRenderer.invoke('sound-motion:set-visualizer-full-screen', fullScreen),
   sendVisualizerCommand: (command) => ipcRenderer.send('sound-motion:visualizer-command', command),

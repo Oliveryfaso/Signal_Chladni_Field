@@ -26,6 +26,7 @@
   .director-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.director-choice{min-width:0;min-height:72px;padding:9px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.025);color:var(--muted);text-align:left;cursor:pointer;font:inherit}.director-choice b{display:block;color:var(--ink);font-size:12px;margin-bottom:2px}.director-choice span{display:block;font-size:10.5px;line-height:1.35}.director-choice[aria-checked="true"]{border-color:var(--node);background:rgba(244,178,60,.1);color:var(--ink)}.director-choice:focus-visible,.director-upload:focus-within,.director-action:focus-visible{outline:2px solid var(--hot);outline-offset:3px}
   .director-format{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}.director-format button{min-height:36px;flex:1;border:1px solid var(--line);border-radius:9px;background:transparent;color:var(--muted);cursor:pointer}.director-format button[aria-pressed="true"]{border-color:var(--hot);background:rgba(131,162,255,.11);color:var(--ink)}.director-duration{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11.5px}.director-duration select{min-width:0;flex:1;border:1px solid var(--line);border-radius:8px;background:#11151b;color:var(--ink);padding:7px 8px;font:inherit}
   .director-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.director-action{min-height:44px;border:1px solid var(--line);border-radius:11px;padding:9px 14px;background:rgba(255,255,255,.035);color:var(--ink);font:600 12px/1.2 inherit;cursor:pointer}.director-action.primary{border:0;background:var(--grad);color:var(--accent-ink)}.director-action:disabled{opacity:.4;cursor:not-allowed}.director-status{min-height:1.45em;margin-top:11px;color:var(--muted);font-size:11.5px}.director-status.error{color:#ff9eab}.director-cues{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.director-cue{border:1px solid rgba(131,162,255,.35);border-radius:999px;padding:4px 8px;color:var(--ink);font:10px/1.2 "SF Mono",ui-monospace,monospace}
+  .director-polish{margin-top:14px;border:1px solid var(--line);border-radius:14px;background:rgba(5,6,9,.34)}.director-polish summary{min-height:44px;display:flex;align-items:center;padding:10px 14px;color:var(--ink);cursor:pointer;font-weight:650;font-size:12px}.director-polish summary::marker{color:var(--node)}.director-polish summary span{margin-left:auto;color:var(--muted);font:10px/1.3 "SF Mono",ui-monospace,monospace}.director-polish-grid{display:grid;grid-template-columns:1fr 1.35fr .8fr;gap:12px;padding:0 14px 14px}.director-polish-block{min-width:0;padding:13px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.022)}.director-polish-block h3{font-size:12px;margin-bottom:8px}.director-field{display:grid;gap:5px;margin-top:8px;color:var(--muted);font-size:10.5px}.director-field input,.director-field select,.director-field textarea{width:100%;min-height:44px;border:1px solid var(--line);border-radius:9px;background:#11151b;color:var(--ink);padding:9px 10px;font:inherit}.director-field textarea{min-height:104px;resize:vertical;line-height:1.45}.director-field input:focus-visible,.director-field select:focus-visible,.director-field textarea:focus-visible{outline:2px solid var(--hot);outline-offset:2px}.director-help{margin-top:7px;color:var(--muted);font-size:10.5px;line-height:1.45}.director-beat-summary{min-height:42px;margin-top:8px;color:var(--muted);font:10.5px/1.45 "SF Mono",ui-monospace,monospace}.director-render-panel{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;margin-top:14px;padding:14px;border:1px solid rgba(131,162,255,.32);border-radius:14px;background:rgba(131,162,255,.06)}.director-render-copy b{display:block;font-size:12.5px}.director-render-hint{display:block;color:var(--muted);font-size:10.5px;margin-top:2px}.director-render-panel .director-action{min-width:150px}.director-queue{grid-column:1/-1;display:grid;gap:7px}.director-queue:empty{display:none}.director-queue-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:rgba(5,6,9,.5)}.director-queue-item b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px}.director-queue-item span{color:var(--muted);font:10px/1.4 "SF Mono",ui-monospace,monospace}.director-queue-item button{min-height:36px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink);padding:6px 10px;cursor:pointer}#directorQueueStatus{grid-column:1/-1;margin-top:0}
   .hero{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;margin-bottom:16px;-webkit-backdrop-filter:blur(26px) saturate(1.3);backdrop-filter:blur(26px) saturate(1.3);box-shadow:0 26px 60px -28px rgba(0,0,0,.7),inset 0 1px 0 var(--glasshi)}
   .inputs{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
   .seg{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
@@ -42,6 +43,7 @@
   .plate-frame:-webkit-full-screen{height:100vh;max-height:none;border-radius:0;border:0}
   #hero-3d{cursor:grab;z-index:0}#hero-3d:active{cursor:grabbing}
   #hero-webgpu{z-index:1;pointer-events:none;opacity:0;mix-blend-mode:screen;transition:opacity .22s ease}.plate-frame.gpu-enhanced #hero-webgpu{opacity:.72}
+  #video-overlay-canvas{z-index:2;pointer-events:none}
   .fsbtn{position:absolute;bottom:12px;left:14px;z-index:3;background:rgba(12,14,19,.6);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:5px 10px;font-size:14px;cursor:pointer;line-height:1}
   .fsbtn:hover{border-color:var(--blue2);color:#fff}
   .badge{position:absolute;top:12px;left:14px;font:600 11px/1 "SF Mono",ui-monospace,monospace;color:var(--muted);letter-spacing:.06em;pointer-events:none;z-index:2}
@@ -86,9 +88,9 @@
   .cell .rule{color:var(--muted);font-size:11.5px;margin-top:3px}
   footer{color:var(--muted);font-size:12px;margin-top:38px;border-top:1px solid var(--line);padding-top:16px}
   kbd{font:inherit;font-size:11px;background:#1a1f25;border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--ink)}
-  @media (max-width:900px){.director-grid{grid-template-columns:1fr 1fr}.director-step:last-child{grid-column:1/-1}}
+  @media (max-width:900px){.director-grid{grid-template-columns:1fr 1fr}.director-step:last-child{grid-column:1/-1}.director-polish-grid{grid-template-columns:1fr 1fr}.director-polish-block:last-child{grid-column:1/-1}}
   @media (max-width:780px){.director-head{display:block}.director-local{margin-top:10px}.grid{grid-template-columns:repeat(2,1fr)}.plate-frame{height:56vh;min-height:320px}.studio-head{display:block}.studio-actions{justify-content:flex-start;margin-top:12px}.studio-timeline{grid-template-columns:auto minmax(120px,1fr)}.timeline-readout{grid-column:1/-1;text-align:left;order:3}}
-  @media (max-width:520px){.grid{grid-template-columns:1fr}body{padding:28px 14px 60px}.music-director{padding:16px}.director-copy h2{font-size:21px}.director-grid{grid-template-columns:1fr}.director-step:last-child{grid-column:auto}.director-options{grid-template-columns:1fr}.director-choice{min-height:58px}.director-actions .director-action{flex:1}.scene-studio{padding:15px}.studio-actions .studio-btn{flex:1}.scene-rail{grid-template-columns:1fr}.studio-timeline{grid-template-columns:1fr}.studio-timeline .studio-btn{width:100%}.timeline-readout{grid-column:auto;order:initial;text-align:left}.renderer-capability{width:100%;margin-left:0}.renderer-capability summary{display:inline-block}.renderer-cap-panel{position:static;width:100%;margin-top:8px}.renderer-cap-panel button{min-height:44px}#solidshape{width:100%;display:grid;grid-template-columns:1.55fr 1fr .7fr;border-radius:14px}#solidshape button{min-width:0;min-height:44px;padding:8px 7px;line-height:1.25}}
+  @media (max-width:520px){.grid{grid-template-columns:1fr}body{padding:28px 14px 60px}.music-director{padding:16px}.director-copy h2{font-size:21px}.director-grid,.director-polish-grid,.director-render-panel{grid-template-columns:1fr}.director-step:last-child,.director-polish-block:last-child{grid-column:auto}.director-options{grid-template-columns:1fr}.director-choice{min-height:58px}.director-polish summary span{display:none}.director-render-panel .director-action{width:100%;min-width:0}.director-actions .director-action{flex:1}.scene-studio{padding:15px}.studio-actions .studio-btn{flex:1}.scene-rail{grid-template-columns:1fr}.studio-timeline{grid-template-columns:1fr}.studio-timeline .studio-btn{width:100%}.timeline-readout{grid-column:auto;order:initial;text-align:left}.renderer-capability{width:100%;margin-left:0}.renderer-capability summary{display:inline-block}.renderer-cap-panel{position:static;width:100%;margin-top:8px}.renderer-cap-panel button{min-height:44px}#solidshape{width:100%;display:grid;grid-template-columns:1.55fr 1fr .7fr;border-radius:14px}#solidshape button{min-width:0;min-height:44px;padding:8px 7px;line-height:1.25}}
   body.native-overlay,body.parity-test{padding:0;background:transparent;overflow:hidden}
   body.native-overlay .wrap,body.parity-test .wrap{max-width:none;width:100vw;height:100vh;margin:0}
   body.native-overlay .music-director,body.parity-test .music-director{display:none}
@@ -100,7 +102,8 @@
   body.native-overlay .plate-frame canvas{cursor:default}
   body.native-overlay.circle .plate-frame{border-radius:50%}
   body.native-overlay .badge,body.native-overlay .viewtag,body.native-overlay .hint,body.native-overlay .fsbtn,
-  body.parity-test .badge,body.parity-test .viewtag,body.parity-test .hint,body.parity-test .fsbtn{display:none}
+  body.parity-test .badge,body.parity-test .viewtag,body.parity-test .hint,body.parity-test .fsbtn,
+  body.native-overlay #video-overlay-canvas,body.parity-test #video-overlay-canvas{display:none}
 </style>
 </head>
 <body>
@@ -138,11 +141,52 @@
         <label class="director-duration">时长<select id="directorDuration"><option value="full">整首音乐</option><option value="15">15 秒</option><option value="30">30 秒</option><option value="60">60 秒</option></select></label>
       </section>
     </div>
+    <details class="director-polish" id="directorFinishing" hidden>
+      <summary><b id="directorFinishingTitle">成片精修</b><span>标题 · LRC 歌词 · 节拍切点</span></summary>
+      <div class="director-polish-grid">
+        <fieldset class="director-polish-block" id="directorTitlePanel">
+          <legend><h3>标题模板</h3></legend>
+          <label class="director-field">样式
+            <select id="directorTitleTemplate">
+              <option value="minimal">极简开场</option><option value="cinematic">电影字幕</option><option value="kinetic">动感标题</option><option value="none">不显示标题</option>
+            </select>
+          </label>
+          <label class="director-field">主标题<input id="directorTitleText" type="text" maxlength="120" placeholder="默认使用歌曲文件名"></label>
+          <label class="director-field">副标题<input id="directorSubtitleText" type="text" maxlength="180" placeholder="艺人、专辑或一句说明"></label>
+          <p class="director-help" id="directorTitleStatus">标题只在开场出现，预览和最终视频使用同一模板。</p>
+        </fieldset>
+        <fieldset class="director-polish-block" id="directorLyricsPanel">
+          <legend><h3>歌词字幕</h3></legend>
+          <label class="director-field">时间戳歌词（LRC）
+            <textarea id="directorLyricsText" placeholder="[00:12.40] 第一行歌词&#10;[00:16.80] 第二行歌词" aria-describedby="directorLyricsStatus"></textarea>
+          </label>
+          <label class="director-field">或导入 .lrc 文件<input id="directorLyricsFile" type="file" accept=".lrc,text/plain"></label>
+          <button class="director-action" id="directorLyricsClear" type="button">清空歌词</button>
+          <p class="director-help" id="directorLyricsStatus" role="status" aria-live="polite">不做联网搜索或无时间戳自动对齐；你的歌词仅保存在本机方案中。</p>
+        </fieldset>
+        <fieldset class="director-polish-block" id="directorBeatPanel">
+          <legend><h3>节拍剪辑</h3></legend>
+          <label class="director-field">切换密度
+            <select id="directorBeatDensity">
+              <option value="relaxed">舒缓 · 按小节</option><option value="balanced" selected>均衡 · 半小节</option><option value="punchy">强烈 · 跟随拍点</option>
+            </select>
+          </label>
+          <p class="director-beat-summary" id="directorBeatSummary">生成音乐编排后显示节拍切点。</p>
+          <div class="director-cues" id="directorBeatCues" aria-label="自动节拍切点"></div>
+        </fieldset>
+      </div>
+    </details>
     <div class="director-actions">
       <button class="director-action primary" id="directorGenerate" type="button" disabled>分析并生成</button>
       <button class="director-action" id="directorPreview" type="button" disabled>▶ 随音乐预览</button>
       <button class="director-action" id="directorExport" type="button" disabled>导出可编辑项目</button>
     </div>
+    <section class="director-render-panel" id="directorRenderPanel" aria-labelledby="directorRenderTitle">
+      <div class="director-render-copy"><b id="directorRenderTitle">生成最终视频</b><span class="director-render-hint" id="directorRenderHint">浏览器不会生成 MP4；请下载创作方案，并在桌面版重新选择同一音频后渲染。</span></div>
+      <button class="director-action primary" id="directorRender" type="button" data-mode="package" disabled>下载创作方案</button>
+      <div class="director-queue" id="directorQueue" role="list" aria-label="视频渲染队列"></div>
+      <p class="director-status" id="directorQueueStatus" role="status" aria-live="polite"></p>
+    </section>
     <p class="director-status" id="directorStatus" role="status" aria-live="polite">选择本地音乐后即可生成；浏览器不会上传文件。</p>
     <div class="director-cues" id="directorCues" aria-label="自动生成的段落"></div>
   </section>
@@ -166,6 +210,7 @@
     <div class="plate-frame" id="stage">
       <canvas id="hero-3d"></canvas>
       <canvas id="hero-webgpu" aria-hidden="true" role="presentation"></canvas>
+      <canvas id="video-overlay-canvas" aria-hidden="true" role="presentation"></canvas>
       <div class="badge">mode <b id="badge-mode">—</b> · energy <b id="badge-energy">—</b> · 节奏 <b id="badge-bpm">—</b></div>
       <div class="viewtag" id="viewtag">3D · 正8面体</div>
       <div class="hint" id="hint">按住左 Command 拖拽旋转</div>
@@ -281,6 +326,8 @@
 <script src="./plate-lab-ui.js"></script>
 <script src="./scene-studio.js"></script>
 <script src="./music-director.js"></script>
+<script src="./production-spec.js"></script>
+<script src="./production-overlay.js"></script>
 <script>
 (function(){
 'use strict';

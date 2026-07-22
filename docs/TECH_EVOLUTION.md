@@ -1,5 +1,14 @@
 # Technical evolution
 
+## 2026-07-23 — Production Spec, shared overlays, and desktop render queue
+
+- Added the strict `signal-field-production/v1` envelope around an unchanged Scene Studio project. It validates four title templates, ordered non-overlapping LRC cues, cut/accent/hold beat edits, output aspect, codec, and safe file name.
+- Added one Canvas compositor shared by browser preview and deterministic export. Title and lyric time boundaries, portrait/square/landscape safe areas, DPR, reduced motion, accent pulses, and hold treatment no longer diverge between UI and encoded frames.
+- Added relaxed, balanced, and punchy beat-edit compilation. Hard cuts reference validated scene IDs; accent and hold events remain visible even when they fall between low-FPS export frames.
+- Added a dedicated Electron Creator window that reuses `app/index.html`, plus a native save flow and in-memory serial queue with queued/running/completed/failed/cancelled states, progress parsing, cancellation, bounded errors, and managed temporary Production Specs.
+- Kept Pages honest: the browser downloads a Production Spec and never claims to encode MP4. Desktop source builds invoke the existing exporter without shell-string execution.
+- Added a real FFmpeg smoke that renders audio, title, lyric, beat cut, and square H.264 output, then verifies the stream using ffprobe.
+
 ## 2026-07-22 — Creator-first automatic music visual MVP
 
 - Added local music analysis with bounded decoding, Blackman-window spectral frames, energy/brightness/roughness/flux features, tempo confidence, and section estimates. No audio upload or new runtime dependency is required.

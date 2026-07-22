@@ -17,9 +17,10 @@ Signal Field is a local-first creation tool that turns one music file into an ed
 
 1. **Automatic music visual:** choose a local song, one of three direction templates, `16:9`, `9:16`, or `1:1`, and a target duration. Analysis extracts energy, spectral balance, change intensity, tempo, and sections without uploading the file.
 2. **Directed preview:** the generated scenes and keyframes are imported through Scene Studio validation, then previewed against the selected audio clock so cuts and transitions stay aligned after seek or replay.
-3. **Refine and export:** adjust the generated scenes with the retained controls and Scene Studio. The Web app exports a portable project JSON; the desktop exporter renders that project with the audio to H.264 MP4 or ProRes MOV.
-4. **Live field:** choose a particle mode, then use the generated demo signal, microphone, user-file, or system-audio input where the platform permits it.
-5. **Advanced labs:** data fields, focus sessions, anomaly replay, and Plate Lab remain available without replacing the creator-first path.
+3. **Finish:** choose an opening-title template, optionally import timestamped LRC lyrics, and select relaxed/balanced/punchy beat-cut density. These settings form a strict Production Spec around the unchanged Scene Studio project.
+4. **Render:** the Web app downloads the Production Spec and honestly requires the desktop app for encoding. The desktop Creator uses a native save dialog and serial render queue with progress, cancellation, completion, and bounded error states.
+5. **Live field:** choose a particle mode, then use the generated demo signal, microphone, user-file, or system-audio input where the platform permits it.
+6. **Advanced labs:** data fields, focus sessions, anomaly replay, and Plate Lab remain available without replacing the creator-first path.
 
 ## Module map
 
@@ -28,6 +29,8 @@ Signal Field is a local-first creation tool that turns one music file into an ed
 | `index.html` | Public/local Web shell, controls, responsive presentation, and the embedded visual engine. |
 | `app/index.html` | Shared particle renderer, audio analysis, data-field controls, and runtime state. |
 | `app/music-director.js` | Dependency-free music feature analysis, tempo/section estimates, and deterministic template-to-project planning. |
+| `app/production-spec.js` | Strict title, LRC lyric, beat-edit, aspect, output, and embedded-project envelope. |
+| `app/production-overlay.js` | Shared Canvas compositor for preview and encoded title/lyric/beat overlays. |
 | `app/scene-studio.js` | Dependency-free, validated scene/project/timeline state and renderer recipe mapping. |
 | `app/scene-studio-ui.js` | Creator flow, audio-clock preview, responsive Scene Studio UI, local persistence, and JSON import/export. |
 | `app/plate-lab-core.js` | Validated SI-unit Kirchhoff–Love rectangular-plate modes, responses, grids, and allowlisted 3D recipes. |
@@ -36,7 +39,8 @@ Signal Field is a local-first creation tool that turns one music file into an ed
 | `app/webgpu-particle-backend.js` | Real WGSL compute/render pipelines, 3D cyclic dual-mode nodal physics, cube/sphere/32-plane convex confinement, per-style force inputs, row-major camera projection, adaptive 64K/128K particles, and device-loss lifecycle. |
 | `app/webgpu-integration.js` | Versioned bridge for the live excitation, dominant modes, rotation, zoom and style; progressive activation, preference, and Canvas fallback control. |
 | `app/renderer-capabilities-ui.js` | Status and controls that distinguish recommendation, actual Canvas/WebGPU runtime, submitted first frame, and fallback reason. |
-| `desktop/` | Electron main process, controller, transparent overlay, tray integration, and system-audio bridge. |
+| `desktop/render-queue.cjs` | Allowlisted serial H.264/ProRes task queue with progress, cancellation, and safe process spawning. |
+| `desktop/` | Electron Creator/control/visualizer windows, native save flow, tray integration, and system-audio bridge. |
 | `macos-screensaver/` | Native Metal implementation for the macOS screen saver. |
 | `macos-lock-launcher/` | macOS configuration and launch utility for the screen saver path. |
 | `scripts/` | Validation, release packaging, screen saver builds, Pages builds, and export automation. |
@@ -51,7 +55,11 @@ npm run build:pages
 npm run verify:pages
 npm run verify:scene-studio
 npm run verify:music-director
+npm run verify:production-spec
+npm run verify:production-overlay
+npm run verify:render-queue
 npm run verify:video-export-options
+npm run verify:video-export-smoke
 npm run verify:plate-lab
 npm run verify:renderer-capabilities
 npm run verify:webgpu
@@ -67,6 +75,8 @@ Inherited icons, media, and the prior Pixabay track were removed from Signal Fie
 
 ## Current scope and next product work
 
-The first creator MVP now performs local music analysis, offers three distinct direction templates and three output aspects, creates a validated Scene Studio timeline, previews it against the uploaded audio, and exports an editable project. The desktop CLI accepts that project and audio for deterministic H.264 or ProRes rendering. It does not yet provide lyrics, beat-by-beat manual editing, a GUI render queue, or additive WebGPU output in encoded video; those are future product work, not current claims.
+The creator workflow now performs local music analysis, offers three direction templates and three aspects, creates a validated Scene Studio timeline, adds four controlled title treatments, imports timestamped LRC lyrics, and produces three densities of deterministic beat edits. Browser preview and final export share the same compositor. The desktop app opens the full Creator in its own window and can add H.264/ProRes work to a serial local queue through a native save dialog.
+
+Current limits are explicit: lyrics require timestamps; there is no speech transcription, lyric search, word-level karaoke, per-beat drag editor, parallel/persistent queue, embedded font pack, or additive WebGPU layer in encoded video. Source/development desktop rendering also requires FFmpeg/ffprobe on the machine. Installed-package render-worker validation remains release work.
 
 The retained baseline still includes Web, Electron, system audio, microphone/file input, four visual styles, fullscreen, macOS screen saver/lock paths, data events, Plate Lab, and the full advanced workspace. Compatible Web browsers can add the 64K/128K WebGPU enhancement, while transparent/native overlays, parity tests, deterministic video exports, unsupported hardware, and device-loss states remain Canvas-only.

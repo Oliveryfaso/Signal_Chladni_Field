@@ -1,9 +1,14 @@
 // Signal Field modification notice (2026-07-20). See LICENSE, UPSTREAM_NOTICE.md, and MODIFICATIONS.md.
 const path = require('node:path');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
+const { fileURLToPath } = require('node:url');
+const { createRenderQueue } = require('./render-queue.cjs');
+const ProductionSpec = require('../app/production-spec.js');
 const {
   app,
   BrowserWindow,
+  dialog,
   Menu,
   desktopCapturer,
   ipcMain,
@@ -21,9 +26,14 @@ const PRELOAD_FILE = path.join(__dirname, 'preload.cjs');
 const APP_ICON_FILE = path.join(__dirname, 'assets', 'signal-field-icon.png');
 const IS_SMOKE = process.argv.includes('--smoke');
 const APP_NAME = 'Signal Field';
+const RENDER_QUEUE_EVENT = 'sound-motion:render-queue-changed';
+const renderQueue = createRenderQueue({ root: ROOT_DIR });
+const TERMINAL_RENDER_STATUSES = new Set(['completed', 'failed', 'cancelled']);
+const MAX_PRODUCTION_JSON_BYTES = 6 * 1024 * 1024;
 
 let controllerWindow = null;
 let visualizerWindow = null;
+let creatorWindow = null;
 let tray = null;
 let trayTitle = '';
 let pendingVisualizerCommands = [];
@@ -32,6 +42,67 @@ let systemAudioFollowing = false;
 let appPreferences = {
   systemAudioPromptSeen: false
 };
+let renderTempDirectory = null;
+const managedProductionFiles = new Set();
+
+function trustedDesktopContents(sender, senderURL) {
+  if (!sender || sender.isDestroyed()) return false;
+  const trustedContents = [controllerWindow, visualizerWindow, creatorWindow]
+    .filter((window) => window && !window.isDestroyed())
+    .map((window) => window.webContents);
+  if (!trustedContents.includes(sender)) return false;
+  try {
+    if (!senderURL.startsWith('file:')) return false;
+    const senderFile = fileURLToPath(senderURL.split(/[?#]/, 1)[0]);
+    return senderFile === CONTROLLER_FILE || senderFile === VISUALIZER_FILE;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function trustedDesktopSender(event) {
+  const sender = event && event.sender;
+  const senderURL = event && event.senderFrame && event.senderFrame.url
+    ? event.senderFrame.url
+    : sender && sender.getURL();
+  return trustedDesktopContents(sender, senderURL || '');
+}
+
+function requireTrustedDesktopSender(event) {
+  if (!trustedDesktopSender(event)) throw new Error('untrusted desktop IPC sender');
+}
+
+function broadcastRenderQueueChange(task) {
+  if (task.production && TERMINAL_RENDER_STATUSES.has(task.status)) cleanupManagedProductionFile(task.production);
+  for (const window of [controllerWindow, visualizerWindow, creatorWindow]) {
+    if (!window || window.isDestroyed() || window.webContents.isLoading()) continue;
+    if (!trustedDesktopContents(window.webContents, window.webContents.getURL())) continue;
+    window.webContents.send(RENDER_QUEUE_EVENT, task);
+  }
+}
+
+renderQueue.onChange(broadcastRenderQueueChange);
+
+function ensureRenderTempDirectory() {
+  if (renderTempDirectory) return renderTempDirectory;
+  const parent = path.join(app.getPath('temp'), 'signal-field-render');
+  fs.mkdirSync(parent, { recursive: true, mode: 0o700 });
+  renderTempDirectory = fs.mkdtempSync(path.join(parent, 'session-'));
+  return renderTempDirectory;
+}
+
+function cleanupManagedProductionFile(file) {
+  if (!managedProductionFiles.has(file)) return;
+  managedProductionFiles.delete(file);
+  try { fs.rmSync(file, { force: true }); } catch (_error) {}
+}
+
+function cleanupRenderTempDirectory() {
+  for (const file of Array.from(managedProductionFiles)) cleanupManagedProductionFile(file);
+  if (!renderTempDirectory) return;
+  try { fs.rmSync(renderTempDirectory, { recursive: true, force: true }); } catch (_error) {}
+  renderTempDirectory = null;
+}
 
 // On macOS, Screen Recording permission can be denied after Chromium has
 // already issued getDisplayMedia(). Electron then rejects its internal capture
@@ -264,6 +335,13 @@ function showControllerWindow() {
   return win;
 }
 
+function showCreatorWindow() {
+  const win = createCreatorWindow();
+  win.show();
+  win.focus();
+  return win;
+}
+
 function showVisualizerWindow() {
   const win = createVisualizerWindow();
   win.show();
@@ -309,6 +387,45 @@ function createControllerWindow() {
   });
 
   return controllerWindow;
+}
+
+function createCreatorWindow() {
+  if (creatorWindow && !creatorWindow.isDestroyed()) return creatorWindow;
+
+  creatorWindow = new BrowserWindow({
+    width: 1440,
+    height: 920,
+    minWidth: 900,
+    minHeight: 640,
+    show: false,
+    title: `${APP_NAME} Creator`,
+    backgroundColor: '#07080c',
+    icon: createWindowIcon(),
+    webPreferences: {
+      preload: PRELOAD_FILE,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      backgroundThrottling: false
+    }
+  });
+
+  creatorWindow.loadFile(VISUALIZER_FILE);
+  creatorWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/.test(url)) shell.openExternal(url).catch(() => {});
+    return { action: 'deny' };
+  });
+  creatorWindow.webContents.on('will-navigate', (event, url) => {
+    try {
+      if (url.startsWith('file:') && fileURLToPath(url.split(/[?#]/, 1)[0]) === VISUALIZER_FILE) return;
+    } catch (_error) {}
+    event.preventDefault();
+    if (/^https?:/.test(url)) shell.openExternal(url).catch(() => {});
+  });
+  creatorWindow.on('closed', () => {
+    creatorWindow = null;
+  });
+  return creatorWindow;
 }
 
 function createVisualizerWindow() {
@@ -472,6 +589,12 @@ input.select();
 
 function visualizerMenuItems() {
   return [
+    {
+      label: 'Open Creator Workspace',
+      accelerator: 'CmdOrCtrl+Shift+C',
+      click: () => showCreatorWindow()
+    },
+    { type: 'separator' },
     { label: 'Show Controls', accelerator: 'CmdOrCtrl+,', click: () => showControllerWindow() },
     {
       label: 'Show Visualizer',
@@ -615,7 +738,7 @@ function lightingMenuItems() {
 }
 
 function windowMenuItems() {
-  return visualizerMenuItems().slice(4);
+  return visualizerMenuItems().slice(6);
 }
 
 function systemAudioMenuItems() {
@@ -636,6 +759,8 @@ function systemAudioMenuItems() {
 function menuBarMenuTemplate() {
   return [
     ...systemAudioMenuItems(),
+    { type: 'separator' },
+    { label: '打开创作工作台', click: () => showCreatorWindow() },
     { type: 'separator' },
     { label: 'Show Controls', click: () => showControllerWindow() },
     { label: 'Show Visualizer', click: () => showVisualizerWindow() },
@@ -784,6 +909,109 @@ async function openSystemAudioSettings() {
   return false;
 }
 
+function plainObject(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function normalizeRenderOutputRequest(input) {
+  if (!plainObject(input)) throw new Error('render output options must be an object');
+  const unknown = Object.keys(input).find((key) => key !== 'codec' && key !== 'fileName');
+  if (unknown) throw new Error(`unknown render output field: ${unknown}`);
+  const codec = input.codec;
+  if (codec !== 'h264' && codec !== 'prores') throw new Error('codec must be h264 or prores');
+  const extension = codec === 'prores' ? '.mov' : '.mp4';
+  const fallback = `signal-field-video${extension}`;
+  const fileName = input.fileName == null || input.fileName === '' ? fallback : input.fileName;
+  if (typeof fileName !== 'string' || fileName.length > 160 || path.basename(fileName) !== fileName ||
+      /[<>:"/\\|?*]/.test(fileName) || fileName === '.' || fileName === '..' || fileName.includes('..')) {
+    throw new Error('fileName must be a safe base file name');
+  }
+  const normalizedName = path.extname(fileName) ? fileName : `${fileName}${extension}`;
+  if (!normalizedName.toLowerCase().endsWith(extension)) throw new Error('fileName extension must match codec');
+  return { codec, fileName: normalizedName, extension };
+}
+
+async function chooseRenderOutput(event, input) {
+  requireTrustedDesktopSender(event);
+  const options = normalizeRenderOutputRequest(input);
+  const parent = BrowserWindow.fromWebContents(event.sender);
+  const dialogOptions = {
+    title: '保存最终视频',
+    defaultPath: options.fileName,
+    buttonLabel: '加入渲染队列',
+    filters: [{
+      name: options.codec === 'prores' ? 'ProRes 视频' : 'H.264 视频',
+      extensions: [options.extension.slice(1)]
+    }],
+    properties: ['createDirectory', 'showOverwriteConfirmation']
+  };
+  const result = parent
+    ? await dialog.showSaveDialog(parent, dialogOptions)
+    : await dialog.showSaveDialog(dialogOptions);
+  if (result.canceled || !result.filePath) return { cancelled: true, filePath: null };
+  let filePath = path.resolve(result.filePath);
+  if (!path.extname(filePath)) filePath += options.extension;
+  if (!filePath.toLowerCase().endsWith(options.extension)) {
+    throw new Error(`output must use the ${options.extension} extension`);
+  }
+  return { cancelled: false, filePath };
+}
+
+async function enqueueProduction(event, input) {
+  requireTrustedDesktopSender(event);
+  if (!plainObject(input)) throw new Error('production render request must be an object');
+  const allowed = new Set(['productionJson', 'audioFilePath', 'aspect', 'codec', 'fileName']);
+  const unknown = Object.keys(input).find((key) => !allowed.has(key));
+  if (unknown) throw new Error(`unknown production render field: ${unknown}`);
+  if (typeof input.productionJson !== 'string' || Buffer.byteLength(input.productionJson, 'utf8') > MAX_PRODUCTION_JSON_BYTES) {
+    throw new Error('productionJson must be a string no larger than 6 MB');
+  }
+  if (typeof input.audioFilePath !== 'string' || !input.audioFilePath) throw new Error('audioFilePath is required');
+  let audioStat;
+  try { audioStat = fs.statSync(input.audioFilePath); } catch (_error) { throw new Error('audioFilePath is unavailable'); }
+  if (!audioStat.isFile() || audioStat.size <= 0) throw new Error('audioFilePath must be a non-empty file');
+
+  const imported = ProductionSpec.import(input.productionJson);
+  const aspect = input.aspect == null || input.aspect === '' ? imported.aspect : input.aspect;
+  const codec = input.codec == null || input.codec === '' ? imported.output.codec : input.codec;
+  const outputExtension = codec === 'prores' ? '.mov' : '.mp4';
+  const inheritedFileName = codec === imported.output.codec
+    ? imported.output.fileName
+    : `${path.basename(imported.output.fileName, path.extname(imported.output.fileName))}${outputExtension}`;
+  const outputOptions = normalizeRenderOutputRequest({
+    codec,
+    fileName: input.fileName == null || input.fileName === '' ? inheritedFileName : input.fileName
+  });
+  const production = ProductionSpec.create({
+    ...imported,
+    aspect,
+    output: { codec: outputOptions.codec, fileName: outputOptions.fileName }
+  });
+  const selected = await chooseRenderOutput(event, outputOptions);
+  if (selected.cancelled) return null;
+
+  const directory = ensureRenderTempDirectory();
+  const productionFile = path.join(directory, `${crypto.randomUUID()}.production.json`);
+  const productionJson = ProductionSpec.export(production, { pretty: false });
+  fs.writeFileSync(productionFile, productionJson, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+  managedProductionFiles.add(productionFile);
+  try {
+    const task = renderQueue.enqueue({
+      production: productionFile,
+      audio: input.audioFilePath,
+      output: selected.filePath,
+      aspect: production.aspect,
+      codec: production.output.codec
+    }, { allowExistingOutput: true });
+    return task;
+  } catch (error) {
+    cleanupManagedProductionFile(productionFile);
+    throw error;
+  }
+}
+
 ipcMain.handle('sound-motion:get-state', () => ({ ...visualizerState }));
 
 ipcMain.handle('sound-motion:get-control-state', () => ({ ...controlState }));
@@ -817,6 +1045,31 @@ ipcMain.handle('sound-motion:show-visualizer', () => {
 ipcMain.handle('sound-motion:hide-visualizer', () => {
   hideVisualizerWindow();
   return true;
+});
+
+ipcMain.handle('sound-motion:show-creator', (event) => {
+  requireTrustedDesktopSender(event);
+  showCreatorWindow();
+  return true;
+});
+
+ipcMain.handle('sound-motion:choose-render-output', (event, options) => chooseRenderOutput(event, options));
+
+ipcMain.handle('sound-motion:enqueue-production', (event, options) => enqueueProduction(event, options));
+
+ipcMain.handle('sound-motion:render-queue-enqueue', (event, task) => {
+  requireTrustedDesktopSender(event);
+  return renderQueue.enqueue(task);
+});
+
+ipcMain.handle('sound-motion:render-queue-list', (event) => {
+  requireTrustedDesktopSender(event);
+  return renderQueue.list();
+});
+
+ipcMain.handle('sound-motion:render-queue-cancel', (event, id) => {
+  requireTrustedDesktopSender(event);
+  return renderQueue.cancel(id);
 });
 
 ipcMain.on('sound-motion:visualizer-command', (_event, command) => {
@@ -856,12 +1109,31 @@ ipcMain.on('sound-motion:native-message', (_event, message) => {
 async function runSmokeCheck() {
   createControllerWindow();
   createVisualizerWindow();
+  createCreatorWindow();
   await Promise.all([
     controllerWindow.webContents.executeJavaScript('document.readyState'),
     visualizerWindow.webContents.executeJavaScript(
       'new Promise((resolve) => setTimeout(() => resolve(Boolean(window.soundMotionNative)), 900))'
+    ),
+    creatorWindow.webContents.executeJavaScript(
+      'new Promise((resolve) => setTimeout(() => resolve({ director: Boolean(document.getElementById("musicDirector")), display: getComputedStyle(document.getElementById("musicDirector")).display, desktop: Boolean(window.soundMotionDesktop) }), 900))'
     )
   ]);
+  const creatorState = await creatorWindow.webContents.executeJavaScript(`({
+    director: Boolean(document.getElementById('musicDirector')),
+    display: getComputedStyle(document.getElementById('musicDirector')).display,
+    desktop: Boolean(window.soundMotionDesktop),
+    pathForFile: typeof window.soundMotionDesktop.pathForFile,
+    enqueueProduction: typeof window.soundMotionDesktop.enqueueProduction
+  });`);
+  const controllerHasCreatorButton = await controllerWindow.webContents.executeJavaScript(
+    'Boolean(document.getElementById("show-creator"))'
+  );
+  if (!creatorState.director || creatorState.display === 'none' || !creatorState.desktop ||
+      creatorState.pathForFile !== 'function' || creatorState.enqueueProduction !== 'function' ||
+      !controllerHasCreatorButton || creatorWindow.isVisible()) {
+    throw new Error('creator-window-smoke-invalid');
+  }
   if (!tray || tray.isDestroyed()) throw new Error('menu-bar-tray-not-created');
   const trayTemplate = menuBarMenuTemplate();
   if (trayTemplate[0].label !== '跟随系统音频' || trayTemplate[1].label !== '取消跟随系统音频') {
@@ -869,6 +1141,9 @@ async function runSmokeCheck() {
   }
   if (trayTemplate[0].enabled !== true || trayTemplate[1].enabled !== false) {
     throw new Error('system-audio-menu-default-state-invalid');
+  }
+  if (!trayTemplate.some((item) => item.label === '打开创作工作台')) {
+    throw new Error('creator-menu-item-not-created');
   }
   const appMenu = Menu.getApplicationMenu();
   if (!appMenu || !appMenu.items.some((item) => item.label === 'Sampling')) {
@@ -1011,4 +1286,9 @@ app.on('activate', () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', () => {
+  renderQueue.shutdown();
+  cleanupRenderTempDirectory();
 });

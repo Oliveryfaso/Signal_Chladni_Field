@@ -50,16 +50,17 @@ Signal Field 把一首本地音乐自动编排成可编辑的 3D 粒子短片时
 1. 打开 Web 创作器并选择本地音频；浏览器不会上传音乐。
 2. 选择“星云轨道”“脉冲切片”或“声沙叙事”，再选择 `16:9`、`9:16` 或 `1:1` 画幅和整首/短时长。
 3. 点击“分析并生成”。Signal Field 会估计音乐强弱、频谱明暗、变化强度、速度与段落，并生成经过校验的场景时间线。
-4. 随原始音乐预览，在下方高级工作台调整任意场景，再导出可编辑项目 JSON。
+4. 展开“成片精修”，选择极简、电影、动感或无标题开场；可粘贴/导入带时间戳的 LRC 歌词，并选择舒缓、均衡或强烈节拍切换。
+5. 随原始音乐预览。预览与最终导出使用同一个字幕/节拍合成器。网页下载经过校验的创作方案；桌面 Creator 可选择“一键渲染视频”，通过原生保存窗口加入本机队列。
 
-最终视频可使用原始音频和导出的项目从桌面命令行渲染：
+桌面 Creator 提供一键路径；等价命令也可以直接读取创作方案：
 
 ```bash
-npm run export:video -- --project signal-field-project.json --audio song.mp3 \
+npm run export:video -- --production signal-field-production.json --audio song.mp3 \
   --aspect 9:16 --output signal-field-video.mp4
 ```
 
-`.mp4` 默认生成 H.264，输出名为 `.mov` 时默认生成 ProRes。网页版目前导出可编辑项目，而不是直接编码视频。确定性视频导出使用完整 Canvas 渲染器，不包含额外叠加的 WebGPU 增强层。
+队列会显示等待、逐帧进度、完成、失败和取消状态。`.mp4` 默认生成 H.264，输出名为 `.mov` 时默认生成 ProRes。网页版导出创作方案而不是伪装成视频，音频也不会打包进 JSON。确定性视频导出使用完整 Canvas 渲染器，不包含额外叠加的 WebGPU 增强层。
 
 ## Web 创作器与高级工作台
 
@@ -68,6 +69,7 @@ npm run export:video -- --project signal-field-project.json --audio song.mp3 \
 **[打开在线 Web Demo](https://oliveryfaso.github.io/Signal_Chladni_Field/)**
 
 - 首屏创作区完成本地上传、三种编排模板、三种输出画幅、自动时间线、音频同步预览和可编辑项目导出。
+- 成片精修支持四种开场标题、带时间戳的 LRC 字幕和三档节拍切换；预览与编码视频共用同一个 Canvas 合成器。
 - 下方完整可视化器支持中文 / English 即时切换，并记住用户选择。
 - 支持随机图案、全屏、暂停旋转和拖拽观察。
 - 高级面板提供进动 / 单轴 / 翻滚、转速、缩放、细节、粒子、打光和立体形状控制。
@@ -155,6 +157,8 @@ Windows 音乐可视化应用目前不作为已完成发布物。仓库已经具
 index.html                  GitHub Pages / 本地 Web 展示壳
 app/index.html              粒子物理、音频分析、Canvas 渲染真源
 app/music-director.js       本地音乐特征分析与确定性自动编排计划
+app/production-spec.js      项目、标题、LRC、节拍和输出的严格创作方案
+app/production-overlay.js   预览/导出共用的标题、歌词、强调和停顿合成器
 app/plate-lab-core.js       薄板模态、频响、网格采样和安全映射核心
 app/plate-lab-ui.js         触控/键盘薄板实验与节点图
 app/scene-studio.js         场景、项目、关键帧与安全配方核心
@@ -164,6 +168,7 @@ app/webgpu-particle-backend.js WGSL Compute/Render、双缓冲和 64K/128K 粒�
 app/webgpu-integration.js    Canvas 主视觉与 WebGPU 增强层的运行时接入
 scripts/verify-webgpu-integration.cjs 形状/力学桥接集成验证
 scripts/export-video.cjs    项目、音频和画幅驱动的 H.264 / ProRes 确定性导出
+desktop/render-queue.cjs    本机串行渲染任务、进度、取消和失败状态
 desktop/                    Electron 主进程、控制面板和系统音频桥
 macos-screensaver/          原生 Metal 屏保
 scripts/build-pages.sh      最小静态发布 artifact
@@ -181,7 +186,11 @@ npm run verify:web-audio
 npm run verify:pages
 npm run verify:scene-studio
 npm run verify:music-director
+npm run verify:production-spec
+npm run verify:production-overlay
+npm run verify:render-queue
 npm run verify:video-export-options
+npm run verify:video-export-smoke
 npm run verify:plate-lab
 npm run verify:renderer-capabilities
 npm run verify:webgpu
@@ -193,7 +202,7 @@ npm run verify:mac-parity
 
 ```bash
 npm run capture:release-media
-npm run export:video -- --project signal-field-project.json --audio song.mp3 \
+npm run export:video -- --production signal-field-production.json --audio song.mp3 \
   --aspect 9:16 --output exports/signal-field-music-video.mp4
 
 # 也可以不使用场景项目，手动指定单个视觉：

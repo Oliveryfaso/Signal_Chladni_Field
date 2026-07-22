@@ -1,5 +1,21 @@
 # Decision log
 
+## 2026-07-23 — Separate production instructions from scene state
+
+**Decision:** Keep Scene Studio focused on reusable renderer snapshots and wrap it in a versioned Production Spec for titles, timestamped lyrics, beat edits, aspect, codec, and file name. Use one overlay compositor in browser preview and deterministic video export.
+
+**Why:** Scene state and editorial delivery metadata evolve at different rates. The envelope preserves old project compatibility, makes untrusted imports strictly testable, and prevents subtitles that only exist in the page DOM or disappear from final frames.
+
+**Boundary:** LRC must already contain timestamps. The first beat editor offers three deterministic densities, not a multi-track NLE. Browser builds download the spec; only the trusted desktop bridge can show a native save dialog and enqueue local encoding.
+
+## 2026-07-23 — Queue local renders serially
+
+**Decision:** Provide a dedicated desktop Creator window and a one-at-a-time render queue with explicit queued/running/completed/failed/cancelled states.
+
+**Why:** Particle rendering and H.264/ProRes encoding are resource-heavy; serial work is predictable and makes cancellation, progress, and error recovery understandable. A native save dialog prevents renderer code from selecting arbitrary output paths.
+
+**Boundary:** Queue history is memory-only and is not resumed after restart. Parallel rendering, task reordering, cloud rendering, and packaged render-worker validation are future release work.
+
 ## 2026-07-22 — Make an automatic music visual the primary product result
 
 **Decision:** Lead with a four-step local workflow — upload music, choose a direction template and aspect, generate/preview an editable Scene Studio timeline, then export the project or render it with the desktop CLI. Keep the former visualizer and research surfaces as the advanced workspace.

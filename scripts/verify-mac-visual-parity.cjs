@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, nativeImage } = require('electron');
 
 const ROOT = path.join(__dirname, '..');
 const VISUALIZER_FILE = path.join(ROOT, 'app', 'index.html');
@@ -10,6 +10,11 @@ const HEIGHT = 640;
 const MAX_MEAN_DIFF = 0.15;
 const MAX_CHANNEL_DIFF = 6;
 const MAX_PIXEL_RATIO = 0.0005;
+
+// This suite verifies deterministic Canvas parity, not GPU-driver rasterization.
+// Force Chromium's software Canvas path so identical particle coordinates do
+// not acquire a few machine/load-dependent antialiasing pixels.
+app.disableHardwareAcceleration();
 
 const CASES = [
   {
@@ -155,7 +160,9 @@ async function applyCommands(win, commands) {
 }
 
 async function captureBitmap(win, label) {
-  const image = await win.webContents.capturePage({ x: 0, y: 0, width: WIDTH, height: HEIGHT });
+  const dataURL = await win.webContents.executeJavaScript("document.getElementById('hero-3d').toDataURL('image/png')");
+  const image = nativeImage.createFromDataURL(dataURL);
+  if (image.isEmpty()) throw new Error(`Canvas capture is empty for ${label}`);
   const size = image.getSize();
   const png = image.toPNG();
   fs.writeFileSync(path.join(OUT_DIR, `${label}.png`), png);
@@ -199,13 +206,22 @@ function compareBitmaps(a, b) {
 
 async function runCase(testCase, index) {
   const seed = 20260627 + index * 101;
+  let webState;
+  let webShot;
   const web = await createWindow('web', seed);
-  const desktop = await createWindow('app', seed);
-
   try {
-    const webState = await applyCommands(web, testCase.commands);
+    webState = await applyCommands(web, testCase.commands);
+    webShot = await captureBitmap(web, `${testCase.name}-web`);
+  } finally {
+    web.destroy();
+  }
+
+  // Render the two deterministic surfaces serially. Running two high-density
+  // Canvas instances at once can make Chromium evict/recreate GPU tiles between
+  // captures, producing a handful of driver-dependent antialiasing pixels.
+  const desktop = await createWindow('app', seed);
+  try {
     const desktopState = await applyCommands(desktop, testCase.commands);
-    const webShot = await captureBitmap(web, `${testCase.name}-web`);
     const desktopShot = await captureBitmap(desktop, `${testCase.name}-mac`);
     const diff = compareBitmaps(webShot, desktopShot);
     const passed =
@@ -222,7 +238,6 @@ async function runCase(testCase, index) {
       desktopState
     };
   } finally {
-    web.destroy();
     desktop.destroy();
   }
 }

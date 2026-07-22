@@ -3,6 +3,7 @@ const path = require('node:path');
 const { once } = require('node:events');
 const { spawn, spawnSync } = require('node:child_process');
 const SceneStudio = require('../app/scene-studio.js');
+const ProductionSpec = require('../app/production-spec.js');
 
 const ROOT = path.join(__dirname, '..');
 const VISUALIZER_FILE = path.join(ROOT, 'app', 'index.html');
@@ -26,16 +27,15 @@ const ASPECTS = Object.freeze({
 const FLAG_ARGS = new Set(['alpha', 'no-rotation', 'help']);
 const VALUE_ARGS = new Set([
   'aspect', 'audio', 'codec', 'fps', 'height', 'light', 'output', 'particles', 'pattern', 'project',
-  'rotation', 'rotation-speed', 'seconds', 'seed', 'style', 'width'
+  'production', 'rotation', 'rotation-speed', 'seconds', 'seed', 'style', 'width'
 ]);
 
 const HELP = `Usage:
   npm run export:video -- --output <file.mov|file.mp4> [options]
-
-Required:
-  --output <path>          Output file. .mov defaults to ProRes; .mp4 defaults to H.264.
+  npm run export:video -- --production <spec.json> [options]
 
 Options:
+  --output <path>         Output file. Required unless --production supplies a safe file name.
   --codec <prores|h264>   Override codec inferred from the output extension.
   --aspect <ratio>        16:9, 9:16, or 1:1; cannot be combined with width/height.
   --style <name>          sand, msand, cosmic, or dcosmic (default: cosmic).
@@ -46,6 +46,7 @@ Options:
   --seed <integer>        Deterministic particle seed (default: 20260710).
   --pattern <json>        Captured pattern JSON; otherwise uses the Web showcase default.
   --project <json>        Valid Signal Field Scene Studio project; drives the export timeline.
+  --production <json>     Production spec with project, aspect, titles, lyrics, edits, and output defaults.
   --audio <file>          Drive every frame from this audio and include it in the output.
   --particles <0..1>      Particle-count scale (default: 0.15).
   --light <0..9>          3D lighting model; 0 is depth, 9 is sweep (default: 9).
@@ -111,27 +112,89 @@ function loadSceneProject(file) {
   return { file: projectFile, project };
 }
 
+function loadProductionSpec(file) {
+  const productionFile = path.resolve(file);
+  if (!fs.existsSync(productionFile) || !fs.statSync(productionFile).isFile()) {
+    throw new Error(`Production specification is unavailable: ${productionFile}`);
+  }
+  const size = fs.statSync(productionFile).size;
+  if (size > ProductionSpec.MAX_PROJECT_BYTES + 1024 * 1024) {
+    throw new Error('Production specification must not exceed 6 MB');
+  }
+  const production = ProductionSpec.import(fs.readFileSync(productionFile, 'utf8'));
+  if (production.project.timeline.durationMs <= 0 || !production.project.timeline.keyframes.length) {
+    throw new Error('Production specification requires a non-empty project timeline with a positive duration');
+  }
+  return { file: productionFile, production };
+}
+
 function timelineSnapshotAt(project, timeMs) {
   return SceneStudio.seekTimeline(project, timeMs);
+}
+
+function productionSnapshotAt(production, timeMs, previousTimeMs) {
+  const project = production.project;
+  const base = timelineSnapshotAt(project, timeMs);
+  let cut = null;
+  for (let index = production.beatEdits.length - 1; index >= 0; index -= 1) {
+    const edit = production.beatEdits[index];
+    if (edit.timeMs <= timeMs && edit.action === 'cut') {
+      cut = edit;
+      break;
+    }
+  }
+  if (!cut || !cut.targetSceneId) return base;
+  const crossed = Number.isFinite(previousTimeMs) && cut.timeMs > previousTimeMs && cut.timeMs <= timeMs;
+  const nextKeyframe = project.timeline.keyframes.find((keyframe) => keyframe.timeMs > cut.timeMs);
+  if (!crossed && nextKeyframe && timeMs >= nextKeyframe.timeMs) return base;
+  const scene = project.scenes.find((item) => item.id === cut.targetSceneId);
+  if (!scene) throw new Error(`Production cut references an unavailable scene: ${cut.targetSceneId}`);
+  return {
+    ...base,
+    fromId: scene.id,
+    toId: scene.id,
+    progress: 0,
+    snapshot: JSON.parse(JSON.stringify(scene.snapshot)),
+    beatCut: { timeMs: cut.timeMs, targetSceneId: scene.id }
+  };
+}
+
+function productionFrameEffects(production, previousTimeMs, timeMs) {
+  const previous = Number.isFinite(previousTimeMs) ? previousTimeMs : -1;
+  let accentPulse = 0;
+  let holdPulse = 0;
+  const crossed = [];
+  production.beatEdits.forEach((edit) => {
+    if (edit.timeMs > previous && edit.timeMs <= timeMs) {
+      crossed.push({ timeMs: edit.timeMs, action: edit.action });
+      if (edit.action === 'accent') accentPulse = Math.max(accentPulse, edit.intensity);
+      if (edit.action === 'hold') holdPulse = Math.max(holdPulse, edit.intensity);
+    }
+  });
+  return { accentPulse, holdPulse, crossed };
 }
 
 function loadOptions(argv) {
   const args = parseArgs(argv);
   if (args.help) return { help: true };
-  if (!args.output) throw new Error('--output is required');
+  if (args.project && args.production) throw new Error('--production cannot be combined with --project');
+  if (!args.output && !args.production) throw new Error('--output is required unless --production is supplied');
 
-  const aspect = args.aspect || null;
-  const dimensions = aspectDimensions(aspect);
-  if (dimensions && (hasOwn(args, 'width') || hasOwn(args, 'height'))) {
-    throw new Error('--aspect cannot be combined with --width or --height');
+  let production = null;
+  let productionFile = null;
+  if (args.production) {
+    const loaded = loadProductionSpec(args.production);
+    production = loaded.production;
+    productionFile = loaded.file;
   }
-  if (args.project) {
+  const projectSource = Boolean(args.project || production);
+  if (projectSource) {
     const conflicting = ['style', 'pattern', 'particles', 'light', 'rotation', 'rotation-speed', 'no-rotation']
       .filter((key) => hasOwn(args, key));
-    if (conflicting.length) throw new Error(`--project cannot be combined with --${conflicting[0]}`);
+    if (conflicting.length) throw new Error(`${production ? '--production' : '--project'} cannot be combined with --${conflicting[0]}`);
   }
 
-  let project = null;
+  let project = production ? production.project : null;
   let projectFile = null;
   let projectDurationSeconds = null;
   let initialSnapshot = null;
@@ -142,11 +205,25 @@ function loadOptions(argv) {
     projectDurationSeconds = project.timeline.durationMs / 1000;
     initialSnapshot = timelineSnapshotAt(project, 0).snapshot;
     if (!initialSnapshot) throw new Error('Scene project has no snapshot at the start of its timeline');
+  } else if (production) {
+    projectDurationSeconds = project.timeline.durationMs / 1000;
+    initialSnapshot = productionSnapshotAt(production, 0).snapshot;
+    if (!initialSnapshot) throw new Error('Production project has no snapshot at the start of its timeline');
   }
 
-  const output = path.resolve(args.output);
+  const aspect = args.aspect || (production ? production.aspect : null);
+  const dimensions = aspectDimensions(aspect);
+  if (dimensions && (hasOwn(args, 'width') || hasOwn(args, 'height'))) {
+    throw new Error('--aspect or the production aspect cannot be combined with --width or --height');
+  }
+  if (production && aspect !== production.aspect) {
+    production = ProductionSpec.create({ ...production, aspect });
+  }
+  const output = args.output
+    ? path.resolve(args.output)
+    : path.join(path.dirname(productionFile), production.output.fileName);
   const extension = path.extname(output).toLowerCase();
-  const codec = args.codec || (extension === '.mp4' ? 'h264' : 'prores');
+  const codec = args.codec || (production ? production.output.codec : (extension === '.mp4' ? 'h264' : 'prores'));
   const style = initialSnapshot ? initialSnapshot.style : (args.style || 'cosmic');
   const rotationMode = initialSnapshot ? initialSnapshot.rotationMode : (args.rotation || 'precess');
   const width = Math.round(finiteNumber(args.width, dimensions ? dimensions.width : 3840, 'width', 64, 8192));
@@ -194,6 +271,8 @@ function loadOptions(argv) {
     project,
     projectFile,
     projectDurationSeconds,
+    production,
+    productionFile,
     initialSnapshot,
     rotation: initialSnapshot ? initialSnapshot.toggles.rotation : !args['no-rotation'],
     rotationMode,
@@ -505,12 +584,33 @@ async function configureRenderer(win, options) {
   })()`);
 }
 
-async function applyProjectTimeline(win, project, timeMs) {
-  const result = timelineSnapshotAt(project, timeMs);
+async function applyProjectTimeline(win, project, timeMs, production, previousTimeMs) {
+  const result = production ? productionSnapshotAt(production, timeMs, previousTimeMs) : timelineSnapshotAt(project, timeMs);
   if (!result.snapshot) throw new Error(`Scene project has no snapshot at ${result.timeMs} ms`);
   const snapshot = JSON.stringify(result.snapshot);
   await win.webContents.executeJavaScript(`window.__signalFieldApplyExportSnapshot(${snapshot});`);
   return result;
+}
+
+async function loadProductionModules(win, production) {
+  if (!production) return;
+  const serialized = JSON.stringify(production);
+  await win.webContents.executeJavaScript(`new Promise((resolve, reject) => {
+    const load = (file, globalName) => new Promise((done, fail) => {
+      if (window[globalName]) { done(); return; }
+      const script = document.createElement('script');
+      script.src = new URL(file, document.baseURI).href;
+      script.onload = () => window[globalName] ? done() : fail(new Error(globalName + ' was not exposed'));
+      script.onerror = () => fail(new Error('Failed to load ' + file));
+      document.head.appendChild(script);
+    });
+    load('./production-spec.js', 'SignalFieldProductionSpec')
+      .then(() => load('./production-overlay.js', 'SignalFieldProductionOverlay'))
+      .then(() => {
+        window.__signalFieldProduction = window.SignalFieldProductionSpec.import(${serialized});
+        resolve(true);
+      }, reject);
+  })`);
 }
 
 async function createRenderWindow(options) {
@@ -545,10 +645,37 @@ async function createRenderWindow(options) {
 
   win.webContents.setZoomFactor(1);
   await win.loadFile(VISUALIZER_FILE, { query });
+  await loadProductionModules(win, options.production);
   return win;
 }
 
-async function captureCanvasPng(win) {
+async function captureCanvasPng(win, timeMs, productionEffects) {
+  const withProduction = Boolean(productionEffects);
+  if (withProduction) {
+    const effects = JSON.stringify(productionEffects);
+    const base64 = await win.webContents.executeJavaScript(`(() => {
+      const source = document.getElementById('hero-3d');
+      if (!source) throw new Error('Render canvas is unavailable');
+      let composite = window.__signalFieldCompositeCanvas;
+      let overlay = window.__signalFieldOverlayCanvas;
+      if (!composite) composite = window.__signalFieldCompositeCanvas = document.createElement('canvas');
+      if (!overlay) overlay = window.__signalFieldOverlayCanvas = document.createElement('canvas');
+      if (composite.width !== source.width || composite.height !== source.height) {
+        composite.width = source.width; composite.height = source.height;
+        overlay.width = source.width; overlay.height = source.height;
+      }
+      const context = composite.getContext('2d');
+      context.clearRect(0, 0, composite.width, composite.height);
+      context.drawImage(source, 0, 0);
+      window.SignalFieldProductionOverlay.drawOverlay(overlay, window.__signalFieldProduction, ${Number(timeMs)}, {
+        width: source.width, height: source.height, dpr: 1, reducedMotion: false,
+        accentPulse: ${effects}.accentPulse, holdPulse: ${effects}.holdPulse
+      });
+      context.drawImage(overlay, 0, 0);
+      return composite.toDataURL('image/png').slice('data:image/png;base64,'.length);
+    })()`);
+    return Buffer.from(base64, 'base64');
+  }
   const base64 = await win.webContents.executeJavaScript(
     `document.getElementById('hero-3d').toDataURL('image/png').slice('data:image/png;base64,'.length)`
   );
@@ -601,8 +728,10 @@ async function render(options) {
 
     const progressEvery = Math.max(1, Math.round(options.frameCount / 20));
     for (let frame = 0; frame < options.frameCount; frame += 1) {
+      const timeMs = (frame * 1000) / options.fps;
+      const previousTimeMs = frame === 0 ? -1 : ((frame - 1) * 1000) / options.fps;
       if (options.project) {
-        await applyProjectTimeline(win, options.project, (frame * 1000) / options.fps);
+        await applyProjectTimeline(win, options.project, timeMs, options.production, previousTimeMs);
       }
       const featureFrame = audioFrames
         ? JSON.stringify(audioFrames[frame])
@@ -611,7 +740,8 @@ async function render(options) {
       await win.webContents.executeJavaScript(
         `window.soundMotionTest.exportTickForTest(${1 / options.fps}, ${idle}, ${featureFrame});`
       );
-      const png = await captureCanvasPng(win);
+      const effects = options.production ? productionFrameEffects(options.production, previousTimeMs, timeMs) : null;
+      const png = await captureCanvasPng(win, timeMs, effects);
       await writeFrame(ffmpeg, png);
       if ((frame + 1) % progressEvery === 0 || frame + 1 === options.frameCount) {
         console.log(`Rendered ${frame + 1}/${options.frameCount} frames`);
@@ -642,7 +772,7 @@ function runCli() {
       return;
     }
     console.log(
-      `Exporting ${options.width}x${options.height}, ${options.fps} fps, ${options.frameCount} frames, ${options.codec}${options.audio ? ', audio-driven' : ''}${options.project ? ', scene-project' : ''}`
+      `Exporting ${options.width}x${options.height}, ${options.fps} fps, ${options.frameCount} frames, ${options.codec}${options.audio ? ', audio-driven' : ''}${options.production ? ', production-overlay' : (options.project ? ', scene-project' : '')}`
     );
     await render(options);
   }).then(() => {
@@ -658,8 +788,12 @@ module.exports = {
   ASPECTS,
   aspectDimensions,
   loadOptions,
+  loadProductionSpec,
   loadSceneProject,
   parseArgs,
+  productionFrameEffects,
+  productionSnapshotAt,
+  render,
   timelineSnapshotAt
 };
 

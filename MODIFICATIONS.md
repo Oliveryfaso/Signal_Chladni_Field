@@ -6,14 +6,15 @@ Each human-authored inherited implementation and documentation file listed below
 
 ## Modified inherited implementation
 
-- Web and desktop runtime: `app/index.html`, `index.html`, `website/index.html`, `desktop/controller.html`, `desktop/main.cjs`.
+- Web and desktop runtime: `app/index.html`, `index.html`, `website/index.html`, `desktop/controller.html`, `desktop/controller.css`, `desktop/controller.js`, `desktop/main.cjs`, `desktop/preload.cjs`.
 - macOS paths: `macos-localization/en.lproj/Localizable.strings`, `macos-localization/zh-Hans.lproj/Localizable.strings`, `macos-lock-launcher/Info.plist`, `macos-lock-launcher/Sources/main.swift`, `macos-screensaver/Info.plist`, `macos-screensaver/SoundMotionScreenSaver.xcodeproj/project.pbxproj`, `macos-screensaver/Sources/ScreenSaverView.swift`.
-- Build, packaging, verification, and migration tooling: `.github/workflows/release.yml`, `scripts/ScreenSaverProbe.swift`, `scripts/build-mac-lock-launcher.sh`, `scripts/build-mac-screensaver.sh`, `scripts/build-pages.sh`, `scripts/install-mac-lock-launcher.sh`, `scripts/install-mac-screensaver.sh`, `scripts/package-release.sh`, `scripts/verify-mac-screensaver.sh`, `scripts/verify-pages.cjs`, `scripts/verify-web-builtin-audio.cjs`, and `start.command`.
+- Build, packaging, verification, and migration tooling: `.github/workflows/release.yml`, `scripts/ScreenSaverProbe.swift`, `scripts/build-mac-lock-launcher.sh`, `scripts/build-mac-screensaver.sh`, `scripts/build-pages.sh`, `scripts/export-video.cjs`, `scripts/install-mac-lock-launcher.sh`, `scripts/install-mac-screensaver.sh`, `scripts/package-release.sh`, `scripts/verify-mac-screensaver.sh`, `scripts/verify-mac-visual-parity.cjs`, `scripts/verify-pages.cjs`, `scripts/verify-video-export-options.cjs`, `scripts/verify-web-builtin-audio.cjs`, and `start.command`.
 - Package and product documentation: `package.json`, `package-lock.json`, `README.md`, `README.zh-CN.md`, `README.txt`, `RELEASE_CHECKLIST.md`, `THIRD_PARTY_NOTICES.md`, and `VIDEO_SCRIPT_MOTION_100S.zh-CN.md`.
 
 ## Added Signal Field work
 
 - A creator-first Music Video Director with local audio analysis, three automatic direction templates, three output aspects, audio-clock timeline preview, editable project export, and project-driven H.264/ProRes CLI rendering.
+- A strict Production Spec, four title treatments, timestamped LRC subtitles, three beat-cut densities, shared preview/export Canvas compositor, dedicated desktop Creator window, native-save render queue, and real FFmpeg production smoke.
 - Local data-field import, multi-signal mapping, anomaly event bookmarks, deterministic scene recipes, and sample data.
 - The keyboard-accessible interactive resonance laboratory.
 - Versioned Scene Studio projects, scene CRUD/reordering, interpolated timelines, safe import/export, and local project persistence.

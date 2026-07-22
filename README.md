@@ -50,16 +50,17 @@ Each mode remembers its adjusted detail value for the current session. Particle 
 1. Open the Web creator and select a local audio file. The browser does not upload it.
 2. Choose **Ambient Orbit**, **Pulse Cut**, or **Sand Study**, then select `16:9`, `9:16`, or `1:1` and a full/short duration.
 3. Select **Analyze and generate**. Signal Field estimates energy, spectral balance, changes, tempo, and song sections, then creates a validated Scene Studio timeline.
-4. Preview the timeline against the uploaded audio, refine any generated scene in the advanced workspace, and export the editable project JSON.
+4. Open **Finish the video** to choose Minimal, Cinematic, Kinetic, or no opening title; optionally paste/import timestamped LRC lyrics; and choose relaxed, balanced, or punchy beat cuts.
+5. Preview the same title/lyric/beat compositor used by final export. On the Web, download the validated Production Spec. In the desktop Creator, choose **Render video** to select an output location and add the job to the local queue.
 
-To create a final video, render the exported project with the original audio from the desktop CLI:
+The desktop Creator provides the one-click path. The equivalent CLI accepts either a Production Spec or the earlier scene project:
 
 ```bash
-npm run export:video -- --project signal-field-project.json --audio song.mp3 \
+npm run export:video -- --production signal-field-production.json --audio song.mp3 \
   --aspect 9:16 --output signal-field-video.mp4
 ```
 
-The CLI produces H.264 MP4 by default or ProRes MOV when the output ends in `.mov`. Browser export currently produces the editable project, not an encoded video. Deterministic video export uses the complete Canvas renderer and does not include the additive WebGPU enhancement.
+The queue reports waiting, frame progress, completion, failure, and cancellation. The CLI produces H.264 MP4 by default or ProRes MOV when the output ends in `.mov`. Browser export produces the Production Spec, not a fake encoded video; audio is never bundled in that JSON. Deterministic video export uses the complete Canvas renderer and does not include the additive WebGPU enhancement.
 
 ## Web Creator and Advanced Workspace
 
@@ -68,6 +69,7 @@ The repository-root `index.html` is the publishing entry point. It embeds the re
 **[Open the live Web Demo](https://oliveryfaso.github.io/Signal_Chladni_Field/)**
 
 - The creator-first surface handles local upload, three direction templates, three output aspects, automatic scene planning, audio-synchronised preview, and editable project export.
+- Finishing controls add controlled opening-title templates, timestamped LRC subtitles, and three densities of beat cuts. Preview and encoded video share the same Canvas compositor.
 - Switch the full visualizer interface between English and Chinese from the bottom dock.
 - Randomize patterns, enter fullscreen, pause rotation, and drag to inspect the form.
 - Advanced controls cover single-axis rotation, tumble, precession, speed, zoom, detail, particles, lighting, and solid shape.
@@ -155,6 +157,8 @@ Use `npm run package:win` as the development packaging entry point. Windows will
 index.html                  GitHub Pages / local Web showcase shell
 app/index.html              Particle physics, audio analysis, and Canvas rendering source of truth
 app/music-director.js       Local music feature analysis and deterministic automatic direction plans
+app/production-spec.js      Validated project/title/LRC/beat/output production envelope
+app/production-overlay.js   Shared title, lyric, accent, and hold Canvas compositor
 app/plate-lab-core.js       Thin-plate modes, response, sampled grids, and safe mapping core
 app/plate-lab-ui.js         Touch/keyboard Plate Lab and nodal-map interface
 app/scene-studio.js         Scene, project, keyframe, and safe-recipe core
@@ -164,6 +168,7 @@ app/webgpu-particle-backend.js WGSL compute/render, ping-pong buffers, and 64K/1
 app/webgpu-integration.js    Runtime bridge between the Canvas visual and WebGPU enhancement layer
 scripts/verify-webgpu-integration.cjs Shape/force bridge integration verification
 scripts/export-video.cjs    Project/audio/aspect-driven deterministic H.264 and ProRes export
+desktop/render-queue.cjs    Serial local render jobs, progress, cancellation, and failure state
 desktop/                    Electron main process, controls, and system-audio bridge
 macos-screensaver/          Native Metal screen saver
 scripts/build-pages.sh      Minimal static publishing artifact
@@ -181,7 +186,11 @@ npm run verify:web-audio
 npm run verify:pages
 npm run verify:scene-studio
 npm run verify:music-director
+npm run verify:production-spec
+npm run verify:production-overlay
+npm run verify:render-queue
 npm run verify:video-export-options
+npm run verify:video-export-smoke
 npm run verify:plate-lab
 npm run verify:renderer-capabilities
 npm run verify:webgpu
@@ -193,7 +202,7 @@ Regenerate release media with:
 
 ```bash
 npm run capture:release-media
-npm run export:video -- --project signal-field-project.json --audio song.mp3 \
+npm run export:video -- --production signal-field-production.json --audio song.mp3 \
   --aspect 9:16 --output exports/signal-field-music-video.mp4
 
 # Or render a manually specified visual without a Scene Studio project:
