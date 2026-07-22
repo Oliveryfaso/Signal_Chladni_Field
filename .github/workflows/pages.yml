@@ -23,6 +23,8 @@ jobs:
         uses: actions/checkout@v6
       - name: Configure Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - name: Check source
         run: npm run check
       - name: Build static artifact
