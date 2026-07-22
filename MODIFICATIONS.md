@@ -13,6 +13,7 @@ Each human-authored inherited implementation and documentation file listed below
 
 ## Added Signal Field work
 
+- A creator-first Music Video Director with local audio analysis, three automatic direction templates, three output aspects, audio-clock timeline preview, editable project export, and project-driven H.264/ProRes CLI rendering.
 - Local data-field import, multi-signal mapping, anomaly event bookmarks, deterministic scene recipes, and sample data.
 - The keyboard-accessible interactive resonance laboratory.
 - Versioned Scene Studio projects, scene CRUD/reordering, interpolated timelines, safe import/export, and local project persistence.

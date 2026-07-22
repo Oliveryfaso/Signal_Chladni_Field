@@ -9,14 +9,14 @@
 </p>
 
 <p align="center">
-  <strong>Local-first signal, data, and motion visualizer</strong>
+  <strong>Local-first automatic music visual video creator</strong>
 </p>
 
 <p align="center"><sub>Build and signing status is release-specific; do not treat development artifacts as notarized.</sub></p>
 
 # Signal Field
 
-Signal Field turns sound, data, and motion into evolving three-dimensional resonance fields. The particles are not textures or prerecorded animation: they continuously form nodal structures through modal resonance, inertial motion, and spatial projection.
+Signal Field turns a local music file into an editable 3D particle video timeline. Choose a direction template, aspect, and duration; it analyzes the song on your device, builds a sequence of visual scenes, and previews the result in sync with the original audio. The particles are not textures or prerecorded animation: they continuously form nodal structures through modal resonance, inertial motion, and spatial projection.
 
 The repository contains a deployable Web Demo plus source-buildable Mac music visualizer and native Mac screen saver / lock animation. The Windows visualizer is an open contributor track.
 
@@ -26,7 +26,7 @@ The repository contains a deployable Web Demo plus source-buildable Mac music vi
 
 | Application | Status | Description |
 | --- | --- | --- |
-| Web Demo | [Live demo](https://oliveryfaso.github.io/Signal_Chladni_Field/) | GitHub Pages deployment; generated demo signal drives Dynamic Sand and Dynamic Cosmic |
+| Web creator | [Live app](https://oliveryfaso.github.io/Signal_Chladni_Field/) | Upload a local song, generate a directed timeline, preview it with audio, and export an editable project |
 | Mac music visualizer | Source build available | Electron app that follows system audio after permission, with overlay and fullscreen modes; no notarized binary is claimed |
 | Mac screen saver / lock animation | Source build available | Native Metal renderer for optimized Modal Sand and Cosmic Web animation; build and install locally |
 | Windows music visualizer | Contributors wanted | Cross-platform Electron and packaging foundations exist; Windows adaptation and device validation remain |
@@ -45,13 +45,30 @@ The repository contains a deployable Web Demo plus source-buildable Mac music vi
 
 Each mode remembers its adjusted detail value for the current session. Particle density defaults to `15%`. Dynamic modes include low-frequency modal protection so bass-heavy audio retains visible structural detail.
 
-## Web Demo
+## Create a Music Visual
+
+1. Open the Web creator and select a local audio file. The browser does not upload it.
+2. Choose **Ambient Orbit**, **Pulse Cut**, or **Sand Study**, then select `16:9`, `9:16`, or `1:1` and a full/short duration.
+3. Select **Analyze and generate**. Signal Field estimates energy, spectral balance, changes, tempo, and song sections, then creates a validated Scene Studio timeline.
+4. Preview the timeline against the uploaded audio, refine any generated scene in the advanced workspace, and export the editable project JSON.
+
+To create a final video, render the exported project with the original audio from the desktop CLI:
+
+```bash
+npm run export:video -- --project signal-field-project.json --audio song.mp3 \
+  --aspect 9:16 --output signal-field-video.mp4
+```
+
+The CLI produces H.264 MP4 by default or ProRes MOV when the output ends in `.mov`. Browser export currently produces the editable project, not an encoded video. Deterministic video export uses the complete Canvas renderer and does not include the additive WebGPU enhancement.
+
+## Web Creator and Advanced Workspace
 
 The repository-root `index.html` is the publishing entry point. It embeds the real visual engine from `app/index.html`; there is no second particle implementation to maintain.
 
 **[Open the live Web Demo](https://oliveryfaso.github.io/Signal_Chladni_Field/)**
 
-- Switch the full interface between English and Chinese from the bottom dock.
+- The creator-first surface handles local upload, three direction templates, three output aspects, automatic scene planning, audio-synchronised preview, and editable project export.
+- Switch the full visualizer interface between English and Chinese from the bottom dock.
 - Randomize patterns, enter fullscreen, pause rotation, and drag to inspect the form.
 - Advanced controls cover single-axis rotation, tumble, precession, speed, zoom, detail, particles, lighting, and solid shape.
 - Plate Lab uses analytic rectangular thin-plate modes to expose node lines, theoretical frequency, and excitation coupling, then maps the result into the retained 3D particle field without switching the active audio/data input.
@@ -91,12 +108,14 @@ npm run verify:pages
 
 ## Capability Boundaries
 
-| Capability | Web Demo | Mac visualizer | Mac screen saver / lock animation |
+| Capability | Web creator | Mac visualizer | Mac screen saver / lock animation |
 | --- | --- | --- | --- |
 | Dynamic Sand / Dynamic Cosmic | Supported | Supported | Audio analysis disabled |
 | Modal Sand / Cosmic Web | Supported | Supported | Supported |
 | Generated demo signal | Supported | Supported | Not required |
 | User audio file / microphone | Browser support | Supported | Not supported |
+| Automatic music direction / editable project | Supported for local audio files | Web creator project can be rendered by CLI | Not supported |
+| H.264 / ProRes encoded video | Export project, then use desktop CLI | Supported by deterministic CLI | Not supported |
 | System audio | No general browser API | Supported after explicit permission | Not supported |
 | Transparent overlay and menu bar | Not supported | Supported | Not applicable |
 | WebGPU Compute particle enhancement | Supported in compatible browsers with automatic fallback | Canvas locked for now | Not applicable |
@@ -135,6 +154,7 @@ Use `npm run package:win` as the development packaging entry point. Windows will
 ```text
 index.html                  GitHub Pages / local Web showcase shell
 app/index.html              Particle physics, audio analysis, and Canvas rendering source of truth
+app/music-director.js       Local music feature analysis and deterministic automatic direction plans
 app/plate-lab-core.js       Thin-plate modes, response, sampled grids, and safe mapping core
 app/plate-lab-ui.js         Touch/keyboard Plate Lab and nodal-map interface
 app/scene-studio.js         Scene, project, keyframe, and safe-recipe core
@@ -143,6 +163,7 @@ app/renderer-capabilities.js Renderer capability, fallback, and device-loss stat
 app/webgpu-particle-backend.js WGSL compute/render, ping-pong buffers, and 64K/128K particles
 app/webgpu-integration.js    Runtime bridge between the Canvas visual and WebGPU enhancement layer
 scripts/verify-webgpu-integration.cjs Shape/force bridge integration verification
+scripts/export-video.cjs    Project/audio/aspect-driven deterministic H.264 and ProRes export
 desktop/                    Electron main process, controls, and system-audio bridge
 macos-screensaver/          Native Metal screen saver
 scripts/build-pages.sh      Minimal static publishing artifact
@@ -159,6 +180,8 @@ npm run smoke
 npm run verify:web-audio
 npm run verify:pages
 npm run verify:scene-studio
+npm run verify:music-director
+npm run verify:video-export-options
 npm run verify:plate-lab
 npm run verify:renderer-capabilities
 npm run verify:webgpu
@@ -170,6 +193,10 @@ Regenerate release media with:
 
 ```bash
 npm run capture:release-media
+npm run export:video -- --project signal-field-project.json --audio song.mp3 \
+  --aspect 9:16 --output exports/signal-field-music-video.mp4
+
+# Or render a manually specified visual without a Scene Studio project:
 npm run export:video -- --output exports/signal-field-cosmic-demo.mp4 \
   --style cosmic --width 1280 --height 720 --fps 30 --seconds 6 \
   --codec h264 --rotation precess --rotation-speed 1 --seed 20260711

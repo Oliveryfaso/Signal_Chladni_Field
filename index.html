@@ -19,16 +19,16 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Signal Field — 3D Audio Resonance Visualizer</title>
-<meta name="description" content="声音、数据与动态信号进入三维空间，在实时模态共振中形成沙粒与星尘的节点结构。">
+<meta name="description" content="上传一首歌，在本机把它变成可预览、可编排的 3D 粒子短片。">
 <meta property="og:title" content="Signal Field — 3D Audio Resonance Visualizer">
-<meta property="og:description" content="Explore sound, data and motion as an interactive three-dimensional modal particle field.">
+<meta property="og:description" content="Turn a song into an interactive 3D particle film, processed locally on your device.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Signal Field">
 <meta property="og:url" content="https://oliveryfaso.github.io/Signal_Chladni_Field/">
 <meta property="og:image" content="https://oliveryfaso.github.io/Signal_Chladni_Field/desktop/assets/signal-field-icon.png">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Signal Field — 3D Audio Resonance Visualizer">
-<meta name="twitter:description" content="Explore sound, data and motion as an interactive three-dimensional modal particle field.">
+<meta name="twitter:description" content="Turn a song into an interactive 3D particle film, processed locally on your device.">
 <meta name="twitter:image" content="https://oliveryfaso.github.io/Signal_Chladni_Field/desktop/assets/signal-field-icon.png">
 <style>
   :root{
@@ -60,10 +60,15 @@
     padding:clamp(1.5rem,5vw,3.5rem);
     background:linear-gradient(180deg, rgba(7,8,12,.72) 0%, rgba(7,8,12,.38) 46%, rgba(7,8,12,0) 100%);
   }
+  .hero-copy{ max-width:42rem; }
   .eyebrow{ font-family:var(--mono); font-size:.72rem; letter-spacing:0; text-transform:uppercase; color:var(--amber); margin:0 0 .6rem; opacity:0; transform:translateY(10px); transition:opacity .7s ease, transform .7s ease; }
-  h1.title{ font-size:clamp(2.2rem,3vw + 1.6rem,4.2rem); line-height:1.03; font-weight:750; letter-spacing:0; margin:0 0 .55rem; text-wrap:balance; opacity:0; transform:translateY(16px); transition:opacity .8s ease .08s, transform .8s ease .08s; }
+  h1.title{ max-width:14ch; font-size:clamp(2.2rem,3vw + 1.6rem,4.2rem); line-height:1.03; font-weight:750; letter-spacing:0; margin:0 0 .55rem; text-wrap:balance; opacity:0; transform:translateY(16px); transition:opacity .8s ease .08s, transform .8s ease .08s; }
   .subhead{ font-size:clamp(1rem,.4vw + .92rem,1.2rem); line-height:1.55; color:var(--mist); max-width:34rem; margin:0; opacity:0; transform:translateY(14px); transition:opacity .8s ease .18s, transform .8s ease .18s; }
-  .hero.in .eyebrow, .hero.in h1.title, .hero.in .subhead{ opacity:1; transform:none; }
+  .hero-actions{ display:flex; align-items:center; gap:.8rem; flex-wrap:wrap; margin-top:1rem; pointer-events:auto; opacity:0; transform:translateY(12px); transition:opacity .8s ease .25s, transform .8s ease .25s; }
+  .hero-cta{ display:inline-flex; align-items:center; justify-content:center; min-height:44px; max-width:100%; padding:.65rem 1rem; border:1px solid rgba(244,178,60,.75); border-radius:999px; background:rgba(244,178,60,.15); color:var(--ink); font-size:.9rem; font-weight:700; line-height:1.25; text-decoration:none; box-shadow:0 .8rem 2rem -.9rem rgba(244,178,60,.6); }
+  .hero-cta:hover{ background:rgba(244,178,60,.24); }
+  .hero-note{ max-width:27rem; color:var(--mist); font-size:.78rem; line-height:1.45; }
+  .hero.in .eyebrow, .hero.in h1.title, .hero.in .subhead, .hero.in .hero-actions{ opacity:1; transform:none; }
 
   a:focus-visible, button:focus-visible{ outline:2px solid var(--amber); outline-offset:3px; }
 
@@ -124,6 +129,10 @@
   :-webkit-full-screen .settings-panel{ display:none !important; }
 
   @media (max-width:640px){
+    .hero{ padding:1.25rem; }
+    h1.title{ font-size:clamp(2rem,10vw,2.75rem); }
+    .hero-actions{ align-items:flex-start; flex-direction:column; gap:.55rem; margin-top:.8rem; }
+    .hero-cta{ width:100%; }
     .dock{ left:.75rem; right:.75rem; width:auto; margin:0; max-width:none; flex-direction:column; align-items:stretch; gap:.5rem; padding:.7rem .6rem .6rem; border-radius:22px; }
     .dock-styles{ overflow-x:visible; flex-wrap:wrap; justify-content:center; }
     .dock button{ font-size:.78rem; padding:.45em .8em; }
@@ -131,7 +140,7 @@
     .settings-panel{ top:.75rem; left:.75rem; right:.75rem; width:auto; }
   }
   @media (prefers-reduced-motion:reduce){
-    .eyebrow,h1.title,.subhead,.dock{ transition:none; }
+    .eyebrow,h1.title,.subhead,.hero-actions,.dock{ transition:none; }
   }
 </style>
 </head>
@@ -141,9 +150,15 @@
 <div id="dragLayer" aria-hidden="true"></div>
 
 <div class="hero" id="hero">
-  <p class="eyebrow">SIGNAL FIELD</p>
-  <h1 class="title">Signal Field</h1>
-  <p class="subhead" data-i18n="tagline">声音进入三维空间：在共振的节面上，沙粒与星尘各自找到自己的形状。</p>
+  <div class="hero-copy">
+    <p class="eyebrow">SIGNAL FIELD</p>
+    <h1 class="title" data-i18n="heroTitle">把一首歌变成 3D 粒子短片</h1>
+    <p class="subhead" data-i18n="tagline">上传音乐、选择视觉模板，让 Signal Field 自动编排一段可以继续调整的粒子演出。</p>
+    <div class="hero-actions">
+      <a class="hero-cta" href="app/index.html#music-director" data-i18n="primaryCta">开始制作</a>
+      <span class="hero-note" data-i18n="advancedNote">音乐只在本机处理；完整高级工作台仍然保留。</span>
+    </div>
+  </div>
 </div>
 
 <div class="settings-panel" id="settingsPanel" role="group" aria-label="高级设置" data-i18n-aria="advancedSettings" hidden>
@@ -197,6 +212,7 @@
       <div class="seg" data-control="solidshape" role="group" aria-label="立体形状" data-i18n-aria="solidShape">
         <button type="button" data-value="regular" aria-pressed="true" data-i18n="regular">正 N 面体</button>
         <button type="button" data-value="random" aria-pressed="false" data-i18n="irregular">不规则</button>
+        <button type="button" data-value="sphere" aria-pressed="false" data-i18n="sphere">球体</button>
       </div>
     </div>
     <div class="settings-row">
@@ -261,24 +277,28 @@ var lang='zh';
 try{ lang=localStorage.getItem('chladni-web-lang')||(/^zh\b/i.test(navigator.language)?'zh':'en'); }catch(e){}
 var copy={
   zh:{
-    description:'声音、数据与动态信号进入三维空间，在实时模态共振中形成沙粒与星尘的节点结构。',
-    tagline:'声音进入三维空间：在共振的节面上，沙粒与星尘各自找到自己的形状。',
+    description:'上传一首歌，在本机把它变成可预览、可编排的 3D 粒子短片。',
+    heroTitle:'把一首歌变成 3D 粒子短片',
+    tagline:'上传音乐、选择视觉模板，让 Signal Field 自动编排一段可以继续调整的粒子演出。',
+    primaryCta:'开始制作', advancedNote:'音乐只在本机处理；完整高级工作台仍然保留。',
     engineTitle:'Signal Field 实时演示', advancedSettings:'高级设置', closeSettings:'关闭高级设置',
     rotationMode:'旋转模式', single:'单轴', tumble:'翻滚', precess:'进动', rotationSpeed:'转速', zoom:'缩放', detail:'细节',
     particles:'粒子', particleDensity:'粒子密度', light:'打光', depth:'景深', dim:'弱光', topLight:'顶光', pointLight:'点光源',
-    rimLight:'轮廓光', coreLight:'核心光', sweepLight:'旋转扫光', solidShape:'立体形状', regular:'正 N 面体', irregular:'不规则',
+    rimLight:'轮廓光', coreLight:'核心光', sweepLight:'旋转扫光', solidShape:'立体形状', regular:'正 N 面体', irregular:'不规则', sphere:'球体',
     faces:'面数', symmetry:'中心对称', frame:'边框', on:'开', off:'关', demoControls:'演示控制', switchEngine:'切换引擎',
     dynamicSand:'动态声沙', modalSand:'模态声沙', cosmicWeb:'宇宙网', dynamicCosmic:'动态宇宙网', randomPattern:'随机图案',
     enterFullscreen:'进入全屏', exitFullscreen:'退出全屏', pauseRotation:'暂停旋转', resumeRotation:'继续旋转',
     switchLanguage:'Switch to English', sourceCode:'查看 GitHub 源码'
   },
   en:{
-    description:'Sound, data and motion become three-dimensional nodal structures in a live modal particle field.',
-    tagline:'Sound enters three dimensions, where sand and stardust find form along resonant nodes.',
+    description:'Upload a song and turn it into a previewable, editable 3D particle film on your device.',
+    heroTitle:'Turn a song into a 3D particle film',
+    tagline:'Upload music, choose a visual template, and let Signal Field arrange an editable particle performance.',
+    primaryCta:'Start creating', advancedNote:'Your music stays on this device. The full advanced workspace remains available.',
     engineTitle:'Live Signal Field demo', advancedSettings:'Advanced settings', closeSettings:'Close advanced settings',
     rotationMode:'Rotation', single:'Single axis', tumble:'Tumble', precess:'Precess', rotationSpeed:'Speed', zoom:'Zoom', detail:'Detail',
     particles:'Particles', particleDensity:'Particle density', light:'Lighting', depth:'Depth', dim:'Dim', topLight:'Top', pointLight:'Point',
-    rimLight:'Rim', coreLight:'Core', sweepLight:'Sweep', solidShape:'Solid', regular:'Regular N-face', irregular:'Irregular',
+    rimLight:'Rim', coreLight:'Core', sweepLight:'Sweep', solidShape:'Solid', regular:'Regular N-face', irregular:'Irregular', sphere:'Sphere',
     faces:'Faces', symmetry:'Symmetry', frame:'Frame', on:'On', off:'Off', demoControls:'Demo controls', switchEngine:'Switch engine',
     dynamicSand:'Dynamic Sand', modalSand:'Modal Sand', cosmicWeb:'Cosmic Web', dynamicCosmic:'Dynamic Cosmic', randomPattern:'Random pattern',
     enterFullscreen:'Enter fullscreen', exitFullscreen:'Exit fullscreen', pauseRotation:'Pause rotation', resumeRotation:'Resume rotation',

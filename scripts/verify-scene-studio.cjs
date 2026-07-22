@@ -45,6 +45,8 @@ const snapshot = SceneStudio.createSnapshot({
   patternSpec: { style: 'msand', goal: 8.2, ex: [0.1, 0.2, 0.3], detail: 1.8, shape: 'random', polyN: 11, polySeed: 42, sym: true }
 });
 assert.equal(SceneStudio.validateSnapshot(snapshot).valid, true);
+assert.equal(SceneStudio.createSnapshot({ solidShape: 'sphere', pattern: { shape: 'sphere' } }).solidShape, 'sphere');
+assert.equal(SceneStudio.createSnapshot({ solidShape: 'sphere', pattern: { shape: 'sphere' } }).pattern.shape, 'sphere');
 assert.equal(snapshot.parameters.faces, 11);
 assert.equal(snapshot.toggles.rotation, false);
 assert.equal(snapshot.pattern.polySeed, 42);

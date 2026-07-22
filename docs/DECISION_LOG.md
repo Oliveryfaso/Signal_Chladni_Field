@@ -1,5 +1,13 @@
 # Decision log
 
+## 2026-07-22 — Make an automatic music visual the primary product result
+
+**Decision:** Lead with a four-step local workflow — upload music, choose a direction template and aspect, generate/preview an editable Scene Studio timeline, then export the project or render it with the desktop CLI. Keep the former visualizer and research surfaces as the advanced workspace.
+
+**Why:** More particle controls do not create a complete user outcome. A directed timeline gives musicians and social creators something they can preview, revise, move between devices, and turn into a deliverable video without starting from a blank scene.
+
+**Boundary:** The first version uses lightweight deterministic audio features and three authored templates, not semantic music understanding. Web export is validated project JSON; H.264/ProRes encoding uses the desktop Canvas exporter. Lyrics, captions, manual beat editing, a GUI render queue, and additive WebGPU video export remain future work.
+
 ## 2026-07-22 — Bridge the existing 3D modal state instead of inventing a separate GPU scene
 
 **Decision:** Drive the additive WebGPU layer from two stable dominant CPU modes, their signed relative weights, the three-axis excitation point, and the current row-major rotation/zoom camera. Reuse the established cyclic three-term `phi3` and its analytic gradient in WGSL.

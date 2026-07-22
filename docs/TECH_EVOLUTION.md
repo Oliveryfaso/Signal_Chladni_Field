@@ -1,5 +1,14 @@
 # Technical evolution
 
+## 2026-07-22 — Creator-first automatic music visual MVP
+
+- Added local music analysis with bounded decoding, Blackman-window spectral frames, energy/brightness/roughness/flux features, tempo confidence, and section estimates. No audio upload or new runtime dependency is required.
+- Added three deterministic direction templates — Ambient Orbit, Pulse Cut, and Sand Study — that convert analysis into validated Scene Studio scenes, cues, keyframes, and safe renderer snapshots.
+- Added a primary upload/template/aspect/duration flow above the advanced workspace. It supports `16:9`, `9:16`, and `1:1`, clear empty/error/progress states, keyboard selection, and a 390-pixel mobile layout.
+- Changed automatic preview to follow the uploaded audio's current time. Stopping, seeking, or replaying no longer lets the visual timeline drift on an independent wall clock.
+- Extended deterministic desktop export with `--project` and `--aspect`; project timelines can render with an audio file to H.264 MP4 or ProRes MOV. The Web app intentionally exports the editable project rather than claiming browser-side encoded video.
+- Preserved all four visual styles, Scene Studio, Plate Lab, data/focus workflows, Canvas fallback, and the additive WebGPU enhancement as advanced capabilities.
+
 ## 2026-07-22 — First real WebGPU Compute enhancement
 
 - Added a dependency-free WebGPU backend with real WGSL compute and render pipelines, two ping-pong particle storage buffers, instanced soft particles, adaptive 64K/128K tiers, DPR-aware canvas reconfiguration, and explicit device-loss/resource cleanup.

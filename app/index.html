@@ -20,6 +20,12 @@
   header{display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:26px}
   header h1{font-size:20px;font-weight:700;letter-spacing:-.015em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
   header .sub{color:var(--muted);font-size:12px;letter-spacing:.14em;text-transform:uppercase}
+  .music-director{scroll-margin-top:18px;margin-bottom:18px;padding:24px;border:1px solid rgba(244,178,60,.3);border-radius:18px;background:linear-gradient(135deg,rgba(244,178,60,.10),rgba(131,162,255,.075) 55%,rgba(255,255,255,.025));box-shadow:0 28px 70px -44px rgba(131,162,255,.8),inset 0 1px 0 var(--glasshi)}
+  .director-head{display:flex;justify-content:space-between;align-items:flex-start;gap:24px}.director-copy{max-width:700px}.director-eyebrow{font:700 10px/1 "SF Mono",ui-monospace,monospace;letter-spacing:.15em;color:var(--node)}.director-copy h2{font-size:24px;line-height:1.2;margin:8px 0 7px}.director-copy p{color:var(--muted);font-size:13px}.director-local{display:inline-flex;align-items:center;gap:7px;color:var(--muted);font:600 11px/1.35 "SF Mono",ui-monospace,monospace;white-space:nowrap}.director-local::before{content:'●';color:#6ee7a8;font-size:9px}
+  .director-grid{display:grid;grid-template-columns:minmax(220px,.85fr) minmax(0,1.6fr) minmax(210px,.8fr);gap:14px;margin-top:20px}.director-step{min-width:0;padding:15px;border:1px solid var(--line);border-radius:14px;background:rgba(5,6,9,.42)}.director-step h3{font-size:12px;margin:0 0 10px;color:var(--ink)}.director-step h3 b{color:var(--node);margin-right:6px;font:700 10px/1 "SF Mono",ui-monospace,monospace}.director-upload{display:flex;min-height:74px;align-items:center;justify-content:center;text-align:center;border:1px dashed rgba(244,178,60,.5);border-radius:11px;padding:12px;color:var(--ink);cursor:pointer;font-size:13px}.director-upload:hover,.director-upload:focus-within{border-color:var(--node);background:rgba(244,178,60,.06)}.director-upload input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.director-file{display:block;margin-top:9px;min-height:1.4em;color:var(--muted);font:11px/1.4 "SF Mono",ui-monospace,monospace;overflow-wrap:anywhere}
+  .director-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.director-choice{min-width:0;min-height:72px;padding:9px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.025);color:var(--muted);text-align:left;cursor:pointer;font:inherit}.director-choice b{display:block;color:var(--ink);font-size:12px;margin-bottom:2px}.director-choice span{display:block;font-size:10.5px;line-height:1.35}.director-choice[aria-checked="true"]{border-color:var(--node);background:rgba(244,178,60,.1);color:var(--ink)}.director-choice:focus-visible,.director-upload:focus-within,.director-action:focus-visible{outline:2px solid var(--hot);outline-offset:3px}
+  .director-format{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}.director-format button{min-height:36px;flex:1;border:1px solid var(--line);border-radius:9px;background:transparent;color:var(--muted);cursor:pointer}.director-format button[aria-pressed="true"]{border-color:var(--hot);background:rgba(131,162,255,.11);color:var(--ink)}.director-duration{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11.5px}.director-duration select{min-width:0;flex:1;border:1px solid var(--line);border-radius:8px;background:#11151b;color:var(--ink);padding:7px 8px;font:inherit}
+  .director-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.director-action{min-height:44px;border:1px solid var(--line);border-radius:11px;padding:9px 14px;background:rgba(255,255,255,.035);color:var(--ink);font:600 12px/1.2 inherit;cursor:pointer}.director-action.primary{border:0;background:var(--grad);color:var(--accent-ink)}.director-action:disabled{opacity:.4;cursor:not-allowed}.director-status{min-height:1.45em;margin-top:11px;color:var(--muted);font-size:11.5px}.director-status.error{color:#ff9eab}.director-cues{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.director-cue{border:1px solid rgba(131,162,255,.35);border-radius:999px;padding:4px 8px;color:var(--ink);font:10px/1.2 "SF Mono",ui-monospace,monospace}
   .hero{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;margin-bottom:16px;-webkit-backdrop-filter:blur(26px) saturate(1.3);backdrop-filter:blur(26px) saturate(1.3);box-shadow:0 26px 60px -28px rgba(0,0,0,.7),inset 0 1px 0 var(--glasshi)}
   .inputs{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
   .seg{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
@@ -80,10 +86,12 @@
   .cell .rule{color:var(--muted);font-size:11.5px;margin-top:3px}
   footer{color:var(--muted);font-size:12px;margin-top:38px;border-top:1px solid var(--line);padding-top:16px}
   kbd{font:inherit;font-size:11px;background:#1a1f25;border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--ink)}
-  @media (max-width:780px){.grid{grid-template-columns:repeat(2,1fr)}.plate-frame{height:56vh;min-height:320px}.studio-head{display:block}.studio-actions{justify-content:flex-start;margin-top:12px}.studio-timeline{grid-template-columns:auto minmax(120px,1fr)}.timeline-readout{grid-column:1/-1;text-align:left;order:3}}
-  @media (max-width:520px){.grid{grid-template-columns:1fr}body{padding:28px 14px 60px}.scene-studio{padding:15px}.studio-actions .studio-btn{flex:1}.scene-rail{grid-template-columns:1fr}.studio-timeline{grid-template-columns:1fr}.studio-timeline .studio-btn{width:100%}.timeline-readout{grid-column:auto;order:initial;text-align:left}.renderer-capability{width:100%;margin-left:0}.renderer-capability summary{display:inline-block}.renderer-cap-panel{position:static;width:100%;margin-top:8px}.renderer-cap-panel button{min-height:44px}#solidshape{width:100%;display:grid;grid-template-columns:1.55fr 1fr .7fr;border-radius:14px}#solidshape button{min-width:0;min-height:44px;padding:8px 7px;line-height:1.25}}
+  @media (max-width:900px){.director-grid{grid-template-columns:1fr 1fr}.director-step:last-child{grid-column:1/-1}}
+  @media (max-width:780px){.director-head{display:block}.director-local{margin-top:10px}.grid{grid-template-columns:repeat(2,1fr)}.plate-frame{height:56vh;min-height:320px}.studio-head{display:block}.studio-actions{justify-content:flex-start;margin-top:12px}.studio-timeline{grid-template-columns:auto minmax(120px,1fr)}.timeline-readout{grid-column:1/-1;text-align:left;order:3}}
+  @media (max-width:520px){.grid{grid-template-columns:1fr}body{padding:28px 14px 60px}.music-director{padding:16px}.director-copy h2{font-size:21px}.director-grid{grid-template-columns:1fr}.director-step:last-child{grid-column:auto}.director-options{grid-template-columns:1fr}.director-choice{min-height:58px}.director-actions .director-action{flex:1}.scene-studio{padding:15px}.studio-actions .studio-btn{flex:1}.scene-rail{grid-template-columns:1fr}.studio-timeline{grid-template-columns:1fr}.studio-timeline .studio-btn{width:100%}.timeline-readout{grid-column:auto;order:initial;text-align:left}.renderer-capability{width:100%;margin-left:0}.renderer-capability summary{display:inline-block}.renderer-cap-panel{position:static;width:100%;margin-top:8px}.renderer-cap-panel button{min-height:44px}#solidshape{width:100%;display:grid;grid-template-columns:1.55fr 1fr .7fr;border-radius:14px}#solidshape button{min-width:0;min-height:44px;padding:8px 7px;line-height:1.25}}
   body.native-overlay,body.parity-test{padding:0;background:transparent;overflow:hidden}
   body.native-overlay .wrap,body.parity-test .wrap{max-width:none;width:100vw;height:100vh;margin:0}
+  body.native-overlay .music-director,body.parity-test .music-director{display:none}
   body.native-overlay header,body.native-overlay .inputs,body.native-overlay .tuners,body.native-overlay .transport,body.native-overlay h2,body.native-overlay .lede,body.native-overlay .grid,body.native-overlay #fieldLab,body.native-overlay #sceneStudio,body.native-overlay footer,
   body.parity-test header,body.parity-test .inputs,body.parity-test .tuners,body.parity-test .transport,body.parity-test h2,body.parity-test .lede,body.parity-test .grid,body.parity-test #fieldLab,body.parity-test #sceneStudio,body.parity-test footer{display:none}
   body.native-overlay .hero,body.parity-test .hero{height:100vh;margin:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
@@ -99,11 +107,51 @@
 <div class="wrap">
   <header><h1>Signal Field</h1><span class="sub">sound · data · motion</span></header>
 
+  <section class="music-director" id="musicDirector" aria-labelledby="musicDirectorTitle">
+    <div class="director-head">
+      <div class="director-copy">
+        <span class="director-eyebrow">MUSIC VIDEO DIRECTOR</span>
+        <h2 id="musicDirectorTitle">上传一首歌，自动生成 3D 粒子短片</h2>
+        <p>分析强弱、明暗与节奏变化，自动生成可预览、可继续编辑的场景时间线。原有数据场、实验室和全部高级参数仍保留在下方。</p>
+      </div>
+      <span class="director-local">音乐仅在这台设备上处理</span>
+    </div>
+    <div class="director-grid">
+      <section class="director-step" aria-labelledby="directorStepAudio">
+        <h3 id="directorStepAudio"><b>01</b>选择音乐</h3>
+        <label class="director-upload">选择音频文件并在本地分析<input id="directorAudioFile" type="file" accept="audio/*" aria-describedby="directorFileName directorStatus"></label>
+        <span class="director-file" id="directorFileName">尚未选择音乐</span>
+      </section>
+      <section class="director-step" aria-labelledby="directorStepTemplate">
+        <h3 id="directorStepTemplate"><b>02</b>选择编排模板</h3>
+        <div class="director-options" id="directorTemplates" role="radiogroup" aria-label="音乐视觉编排模板">
+          <button class="director-choice" type="button" role="radio" aria-checked="true" data-template="ambient-orbit"><b>星云轨道</b><span>缓慢推进、空间感和柔和高潮</span></button>
+          <button class="director-choice" type="button" role="radio" aria-checked="false" data-template="pulse-cut"><b>脉冲切片</b><span>跟随瞬态和峰值快速切换</span></button>
+          <button class="director-choice" type="button" role="radio" aria-checked="false" data-template="sand-study"><b>声沙叙事</b><span>沙粒与模态纹理交替沉降</span></button>
+        </div>
+      </section>
+      <section class="director-step" aria-labelledby="directorStepOutput">
+        <h3 id="directorStepOutput"><b>03</b>确定短片规格</h3>
+        <div class="director-format" id="directorAspects" role="group" aria-label="输出画幅">
+          <button type="button" data-aspect="16:9" aria-pressed="true">16:9</button><button type="button" data-aspect="9:16" aria-pressed="false">9:16</button><button type="button" data-aspect="1:1" aria-pressed="false">1:1</button>
+        </div>
+        <label class="director-duration">时长<select id="directorDuration"><option value="full">整首音乐</option><option value="15">15 秒</option><option value="30">30 秒</option><option value="60">60 秒</option></select></label>
+      </section>
+    </div>
+    <div class="director-actions">
+      <button class="director-action primary" id="directorGenerate" type="button" disabled>分析并生成</button>
+      <button class="director-action" id="directorPreview" type="button" disabled>▶ 随音乐预览</button>
+      <button class="director-action" id="directorExport" type="button" disabled>导出可编辑项目</button>
+    </div>
+    <p class="director-status" id="directorStatus" role="status" aria-live="polite">选择本地音乐后即可生成；浏览器不会上传文件。</p>
+    <div class="director-cues" id="directorCues" aria-label="自动生成的段落"></div>
+  </section>
+
   <section class="hero">
     <div class="inputs">
       <div class="seg" id="src">
         <button data-src="demo" class="on">演示信号</button>
-        <button data-src="system" class="on">系统音频</button>
+        <button data-src="system">系统音频</button>
         <button data-src="file">音频文件</button>
         <button data-src="mic">麦克风</button>
         <button data-src="data">数据场</button>
@@ -232,6 +280,7 @@
 <script src="./field-lab.js"></script>
 <script src="./plate-lab-ui.js"></script>
 <script src="./scene-studio.js"></script>
+<script src="./music-director.js"></script>
 <script>
 (function(){
 'use strict';
@@ -1264,19 +1313,22 @@ class AudioSource{
       this.el.load();
     });
   }
-  async play(){
+  async playAt(seconds=0){
     if(!this.loaded || !this.el) return false;
     this.ensureGraph();
     if(this.ctx.state==='suspended') this.ctx.resume().catch(()=>{});
     this.el.pause();
-    try{ this.el.currentTime=0; }catch(e){}
+    try{ this.el.currentTime=Math.max(0,Math.min(this.duration()||0,Number(seconds)||0)); }catch(e){}
     await this.el.play();
     return true;
   }
+  async play(){ return this.playAt(0); }
   stop(){ if(this.el){ this.el.pause(); try{ this.el.currentTime=0; }catch(e){} } }
+	  seek(seconds){ if(!this.el||!this.loaded)return false; try{ this.el.currentTime=Math.max(0,Math.min(this.duration()||0,Number(seconds)||0)); return true; }catch(e){ return false; } }
 	  frame(){ if(!this.an||!this.freq) return SYSTEM_REST_FRAME;
 	    this.an.getByteFrequencyData(this.freq); return bytesToFrame(this.freq); }
   duration(){ return this.el && Number.isFinite(this.el.duration) ? this.el.duration : 0; }
+  state(){ return {loaded:this.loaded,duration:this.duration(),currentTime:this.el&&Number.isFinite(this.el.currentTime)?this.el.currentTime:0,paused:!this.el||this.el.paused,ended:Boolean(this.el&&this.el.ended)}; }
 }
 // Live microphone input — analyser only, never routed to speakers.
 class MicSource{
@@ -1752,7 +1804,7 @@ cube.zoom=ZOOM_3D; classic.zoom=ZOOM_3D;
 cube.dpr=displayDpr(); cube.resize();                      // redraw at device resolution; zoom never scales an old bitmap
 classic.dpr=displayDpr();
 const badgeMode=document.getElementById('badge-mode'), badgeEnergy=document.getElementById('badge-energy'), badgeBpm=document.getElementById('badge-bpm');
-let srcKind=NATIVE_HOST?'system':'demo', audio=new AudioSource(), mic=new MicSource(), system=new NativeSystemSource(), demo=new DemoSignalSource(), data=new LocalDataSource(), playing=false, frozen=false, heroRaf=null, last=0, lastPaint=0;
+let srcKind=NATIVE_HOST?'system':'demo', audio=new AudioSource(), mic=new MicSource(), system=new NativeSystemSource(), demo=new DemoSignalSource(), data=new LocalDataSource(), localAudioFile=null, playing=false, frozen=false, heroRaf=null, last=0, lastPaint=0;
 function syncSourceControls(){
   document.querySelectorAll('#src button').forEach(b=>b.classList.toggle('on',b.dataset.src===srcKind));
   document.getElementById('file-slot').style.display=srcKind==='file'?'inline':'none';
@@ -1913,11 +1965,37 @@ playBtn.onclick=async ()=>{
     playing=true;
     playBtn.textContent='■ 停止'; playBtn.blur(); startHero(); return; }
 };
-document.getElementById('audio-file').addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f)return;
-  if(srcKind==='file' && playing){ playing=false; playBtn.textContent='▶ 播放'; freezeHero(); }
-  try{ await audio.load(f); const dur=audio.duration(); document.getElementById('hero-meta').textContent=f.name+(dur?` · ${fmtTime(dur)}`:''); }
-  catch(err){ document.getElementById('hero-meta').textContent='音频加载失败'; alert('音频加载失败。请换一个浏览器支持的音频格式。'); }
-});
+async function loadLocalAudioFile(file){
+  if(!file||typeof file.arrayBuffer!=='function')throw new TypeError('请选择一个本地音频文件。');
+  if(file.size>512*1024*1024)throw new RangeError('音频文件不能超过 512 MB。');
+  nativeClickSeg('#src','data-src','file');
+  document.getElementById('hero-meta').textContent='正在读取音频…';
+  try{
+    await audio.load(file);
+    const duration=audio.duration();
+    if(!(duration>0))throw new Error('audio-duration-unavailable');
+    localAudioFile=file;
+    const detail={file,name:String(file.name||'本地音乐'),size:Number(file.size)||0,type:String(file.type||''),durationMs:Math.round(duration*1000)};
+    document.getElementById('hero-meta').textContent=`${detail.name} · ${fmtTime(duration)}`;
+    window.dispatchEvent(new CustomEvent('signalfield:audio-loaded',{detail}));
+    return {name:detail.name,size:detail.size,type:detail.type,durationMs:detail.durationMs};
+  }catch(error){
+    localAudioFile=null;
+    document.getElementById('hero-meta').textContent='音频加载失败 · 可重新选择';
+    window.dispatchEvent(new CustomEvent('signalfield:audio-error',{detail:{message:'无法读取这个音频文件，请换用浏览器支持的 MP3、M4A、WAV 或 OGG。'}}));
+    throw error;
+  }
+}
+async function playLocalAudioAt(seconds){
+  if(!audio.loaded)return false;
+  if(playing){ audio.stop(); mic.stop(); system.stop(); demo.stop(); data.stop(); playing=false; }
+  srcKind='file'; syncSourceControls();
+  try{ if(!(await audio.playAt(seconds)))return false; }
+  catch(error){ return false; }
+  playing=true; frozen=false; playBtn.textContent='■ 停止'; startHero();
+  return true;
+}
+document.getElementById('audio-file').addEventListener('change',async e=>{ const file=e.target.files[0]; if(!file)return; try{ await loadLocalAudioFile(file); }catch(_error){} });
 const dataFile=document.getElementById('data-file'),dataColumn=document.getElementById('data-column'),dataMapping=document.getElementById('data-mapping'),dataPosition=document.getElementById('data-position');
 const dataEventsPanel=document.getElementById('dataEventsPanel'),detectEventsBtn=document.getElementById('detectEvents'),exportEventsBtn=document.getElementById('exportEvents'),dataEventChips=document.getElementById('dataEventChips');
 let dataBookmarks=[];
@@ -2275,6 +2353,10 @@ window.soundMotionNative={
     if(srcKind==='system') document.getElementById('hero-meta').textContent=system.status;
   },
   selectSource(kind){ nativeClickSeg('#src','data-src',kind); },
+  loadAudioFile(file){ return loadLocalAudioFile(file); },
+  playFileAt(seconds){ return playLocalAudioAt(seconds); },
+  seekAudio(seconds){ return audio.seek(seconds); },
+  audioState(){ return Object.assign({source:srcKind,playing:playing,fileName:localAudioFile&&localAudioFile.name||null},audio.state()); },
   play(){ frozen=false; if(!playing) playBtn.click(); else ensureLoop(); },
   playDemo(){ return playDemoSignal(); },
   // Kept as a compatibility alias for existing automation callers; it now starts

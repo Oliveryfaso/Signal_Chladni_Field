@@ -23,7 +23,7 @@
   const STYLE_VALUES = ['sand', 'msand', 'cosmic', 'dcosmic'];
   const SAMPLE_MODE_VALUES = ['beat', 'time'];
   const ROTATION_MODE_VALUES = ['single', 'tumble', 'precess'];
-  const SOLID_SHAPE_VALUES = ['regular', 'random'];
+  const SOLID_SHAPE_VALUES = ['regular', 'random', 'sphere'];
   const PUBLIC_METHODS = new Set([
     'setStyle', 'setSampleMode', 'setRotationMode', 'setSolidShape', 'setParam',
     'setBoolean', 'setTransparent', 'applyPatternSpec'

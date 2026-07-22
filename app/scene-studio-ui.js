@@ -11,6 +11,7 @@
   if (params.get('overlay') === '1' || params.get('nativeOverlay') === '1' || params.get('parity') === '1') return;
 
   const Studio = window.SignalFieldSceneStudio;
+  const Director = window.SignalFieldMusicDirector;
   const target = window.soundMotionNative;
   const testApi = window.soundMotionTest;
   const root = document.getElementById('sceneStudio');
@@ -29,6 +30,17 @@
   const timeline = document.getElementById('sceneTimeline');
   const timeLabel = document.getElementById('sceneTime');
   const status = document.getElementById('sceneStatus');
+  const directorRoot = document.getElementById('musicDirector');
+  const directorFileInput = document.getElementById('directorAudioFile');
+  const directorFileName = document.getElementById('directorFileName');
+  const directorTemplates = document.getElementById('directorTemplates');
+  const directorAspects = document.getElementById('directorAspects');
+  const directorDuration = document.getElementById('directorDuration');
+  const directorGenerate = document.getElementById('directorGenerate');
+  const directorPreview = document.getElementById('directorPreview');
+  const directorExport = document.getElementById('directorExport');
+  const directorStatus = document.getElementById('directorStatus');
+  const directorCues = document.getElementById('directorCues');
 
   let store = Studio.createStore(Studio.createProject({
     title: '我的 Signal Field 项目',
@@ -39,9 +51,16 @@
   let playbackStartedAt = 0;
   let playbackRunning = false;
   let playbackStartedDemo = false;
+  let playbackUsingFile = false;
   let previousSource = null;
   let lastAppliedSnapshot = null;
   let lastApplyAt = -Infinity;
+  let musicFile = null;
+  let musicMeta = null;
+  let directionPlan = null;
+  let directionGeneration = 0;
+  let selectedTemplate = 'ambient-orbit';
+  let selectedAspect = '16:9';
 
   function safeLoad() {
     try {
@@ -59,6 +78,13 @@
   function setStatus(message, isError) {
     status.textContent = message;
     status.classList.toggle('error', Boolean(isError));
+  }
+
+  function setDirectorStatus(message, isError) {
+    if (!directorStatus) return;
+    directorStatus.textContent = message;
+    directorStatus.classList.toggle('error', Boolean(isError));
+    directorStatus.setAttribute('role', isError ? 'alert' : 'status');
   }
 
   function formatTime(milliseconds) {
@@ -313,29 +339,35 @@
     return result;
   }
 
-  function startPlayback() {
+  async function startPlayback() {
     if (playbackRunning) { stopPlayback(true); return; }
     const project = store.getProject();
     if (!project.timeline.keyframes.length || !project.timeline.durationMs) return;
     const state = testApi.state();
-    playbackStartedDemo = !state.playing;
     previousSource = state.audioSource;
-    if (playbackStartedDemo) target.playDemo();
+    const current = Number(timeline.value) >= project.timeline.durationMs ? 0 : Number(timeline.value);
+    playbackUsingFile = state.audioSource === 'file' && state.audioFileLoaded && typeof target.playFileAt === 'function';
+    playbackStartedDemo = !playbackUsingFile && !state.playing;
+    if (playbackUsingFile) {
+      const started = await target.playFileAt(current / 1000);
+      if (!started) { playbackUsingFile = false; setStatus('无法播放已上传音乐，请重新选择文件。', true); return; }
+    } else if (playbackStartedDemo) target.playDemo();
     playbackRunning = true;
     playButton.textContent = '■ 停止时间线';
+    if (directorPreview) directorPreview.textContent = '■ 停止预览';
     lastAppliedSnapshot = null;
     lastApplyAt = -Infinity;
-    const current = Number(timeline.value) >= project.timeline.durationMs ? 0 : Number(timeline.value);
     timeline.value = String(current);
     playbackStartedAt = performance.now() - current;
-    setStatus('时间线播放中 · 场景参数会平滑过渡');
+    setStatus(playbackUsingFile ? '时间线正与本地音乐同步播放' : '时间线播放中 · 场景参数会平滑过渡');
     playbackFrame = requestAnimationFrame(playbackTick);
   }
 
   function playbackTick(now) {
     if (!playbackRunning) return;
     const duration = store.getProject().timeline.durationMs;
-    const elapsed = Math.min(duration, now - playbackStartedAt);
+    const audioPlayback = playbackUsingFile && typeof target.audioState === 'function' ? target.audioState() : null;
+    const elapsed = Math.min(duration, audioPlayback ? audioPlayback.currentTime * 1000 : now - playbackStartedAt);
     timeline.value = String(Math.round(elapsed));
     updateTimeLabel();
     if (now - lastApplyAt >= APPLY_INTERVAL_MS || elapsed >= duration) {
@@ -356,11 +388,13 @@
     const wasRunning = playbackRunning;
     playbackRunning = false;
     playButton.textContent = '▶ 播放时间线';
-    if (playbackStartedDemo) {
+    if (directorPreview) directorPreview.textContent = '▶ 随音乐预览';
+    if (playbackStartedDemo || playbackUsingFile) {
       target.stop();
-      if (previousSource && previousSource !== 'demo') target.selectSource(previousSource);
+      if (previousSource && previousSource !== (playbackUsingFile ? 'file' : 'demo')) target.selectSource(previousSource);
     }
     playbackStartedDemo = false;
+    playbackUsingFile = false;
     previousSource = null;
     lastAppliedSnapshot = null;
     if (wasRunning && !keepPosition) setStatus('时间线已停止');
@@ -400,18 +434,181 @@
     }
   }
 
+  function stableSeed(name, size, durationMs) {
+    const text = `${name || 'music'}:${size || 0}:${durationMs || 0}`;
+    let value = 2166136261;
+    for (let index = 0; index < text.length; index += 1) value = Math.imul(value ^ text.charCodeAt(index), 16777619) >>> 0;
+    return value;
+  }
+
+  async function decodeMusicFile(file, maximumDurationMs, generation) {
+    const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextCtor) throw new Error('当前浏览器不支持本地音频分析。');
+    const context = new AudioContextCtor();
+    try {
+      const buffer = await context.decodeAudioData((await file.arrayBuffer()).slice(0));
+      if (generation !== directionGeneration) throw new Error('analysis-cancelled');
+      const durationMs = Math.min(buffer.duration * 1000, maximumDurationMs || buffer.duration * 1000);
+      if (durationMs > 10 * 60 * 1000) throw new RangeError('自动编排第一版最多分析 10 分钟音乐。');
+      const sampleCount = Math.max(1, Math.min(buffer.length, Math.ceil(durationMs / 1000 * buffer.sampleRate)));
+      const samples = new Float32Array(sampleCount);
+      for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+        const source = buffer.getChannelData(channel);
+        const scale = 1 / buffer.numberOfChannels;
+        for (let index = 0; index < sampleCount; index += 1) samples[index] += source[index] * scale;
+      }
+      return { samples, sampleRate: buffer.sampleRate, durationMs };
+    } finally {
+      if (typeof context.close === 'function') context.close().catch(() => {});
+    }
+  }
+
+  function renderDirectionCues(plan) {
+    if (!directorCues) return;
+    directorCues.innerHTML = '';
+    const kindLabels = { quiet: '静音铺垫', transition: '结构转折', percussive: '节奏峰值', bright: '明亮段落', flowing: '流动段落' };
+    plan.cues.forEach((cue) => {
+      const chip = document.createElement('span');
+      chip.className = 'director-cue';
+      chip.textContent = `${formatTime(cue.timeMs)} · ${kindLabels[cue.kind] || cue.kind}`;
+      directorCues.appendChild(chip);
+    });
+  }
+
+  async function generateDirection() {
+    if (!Director || !musicFile || !musicMeta) return;
+    const generation = ++directionGeneration;
+    const previousPlan = directionPlan;
+    directorGenerate.disabled = true;
+    directorPreview.disabled = true;
+    directorExport.disabled = true;
+    setDirectorStatus('正在本机解码并分析音乐…');
+    try {
+      const durationChoice = directorDuration.value === 'full' ? musicMeta.durationMs : Number(directorDuration.value) * 1000;
+      const pcm = await decodeMusicFile(musicFile, Math.min(musicMeta.durationMs, durationChoice), generation);
+      if (generation !== directionGeneration) return;
+      setDirectorStatus('正在识别段落并生成视觉场景…');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const analysis = Director.analyzeMono({ samples: pcm.samples, sampleRate: pcm.sampleRate }, { durationMs: pcm.durationMs, frameRate: 10 });
+      const plan = Director.createPlan(analysis, {
+        template: selectedTemplate,
+        aspect: selectedAspect,
+        title: `${musicMeta.name.replace(/\.[^.]+$/, '')} · ${selectedAspect}`,
+        seed: stableSeed(musicMeta.name, musicMeta.size, pcm.durationMs),
+        maxScenes: 8,
+        baseSnapshot: captureSnapshot()
+      });
+      const canonical = Studio.createProject(plan.project);
+      const validation = Studio.validateProject(canonical);
+      if (!validation.valid) throw new Error(validation.errors.join(' '));
+      stopPlayback(false);
+      store.importJSON(Studio.exportProject(canonical));
+      directionPlan = Object.assign({}, plan, { project: store.getProject() });
+      selectedId = directionPlan.project.scenes[0] ? directionPlan.project.scenes[0].id : null;
+      timeline.value = '0';
+      persist();
+      render();
+      if (directionPlan.project.timeline.keyframes[0]) seekAndApply(0, true);
+      renderDirectionCues(directionPlan);
+      const tempo = analysis.tempo.confidence >= 0.25 ? `${Math.round(analysis.tempo.bpm)} BPM` : '自由节奏';
+      setDirectorStatus(`已生成 ${directionPlan.project.scenes.length} 个段落 · ${tempo} · ${selectedAspect} · 可直接预览或继续编辑`);
+    } catch (error) {
+      if (error && error.message === 'analysis-cancelled') return;
+      directionPlan = previousPlan;
+      setDirectorStatus(`生成失败：${error.message || '无法分析这个文件'}。原有项目已保留。`, true);
+    } finally {
+      if (generation === directionGeneration) {
+        directorGenerate.disabled = !musicFile;
+        directorPreview.disabled = !directionPlan;
+        directorExport.disabled = !directionPlan;
+      }
+    }
+  }
+
+  function selectChoice(container, button, attribute) {
+    container.querySelectorAll('button').forEach((candidate) => {
+      const active = candidate === button;
+      candidate.setAttribute(attribute, String(active));
+      if (attribute === 'aria-checked') candidate.tabIndex = active ? 0 : -1;
+    });
+  }
+
+  async function selectDirectorFile(file) {
+    if (!file) return;
+    const token = ++directionGeneration;
+    directionPlan = null;
+    directorCues.innerHTML = '';
+    directorGenerate.disabled = true;
+    directorPreview.disabled = true;
+    directorExport.disabled = true;
+    directorFileName.textContent = `${file.name} · 正在读取…`;
+    setDirectorStatus('正在读取音频元数据；文件不会离开这台设备。');
+    try {
+      const meta = await target.loadAudioFile(file);
+      if (token !== directionGeneration) return;
+      musicFile = file;
+      musicMeta = Object.assign({ file }, meta);
+      directorFileName.textContent = `${meta.name} · ${formatTime(meta.durationMs)}`;
+      directorGenerate.disabled = false;
+      setDirectorStatus('音乐已就绪。选择模板和画幅后，点击“分析并生成”。');
+    } catch (_error) {
+      if (token !== directionGeneration) return;
+      musicFile = null; musicMeta = null;
+      directorFileName.textContent = '读取失败 · 可重新选择';
+      setDirectorStatus('无法读取这个音频文件，请换用浏览器支持的 MP3、M4A、WAV 或 OGG。', true);
+    } finally {
+      directorFileInput.value = '';
+    }
+  }
+
   captureButton.addEventListener('click', addSceneFromCurrent);
   overwriteButton.addEventListener('click', overwriteSelected);
   importButton.addEventListener('click', () => fileInput.click());
   exportButton.addEventListener('click', exportProject);
   fileInput.addEventListener('change', () => importProjectFile(fileInput.files[0]));
-  playButton.addEventListener('click', startPlayback);
+  playButton.addEventListener('click', () => { startPlayback(); });
   timeline.addEventListener('input', () => {
     stopPlayback(true);
     seekAndApply(Number(timeline.value), false);
     setStatus('正在预览时间线；松开后粒子会继续收敛');
   });
   window.addEventListener('beforeunload', () => stopPlayback(true));
+
+  if (directorRoot && Director) {
+    directorFileInput.addEventListener('change', () => selectDirectorFile(directorFileInput.files[0]));
+    directorTemplates.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-template]'); if (!button) return;
+      selectedTemplate = button.dataset.template; selectChoice(directorTemplates, button, 'aria-checked');
+      if (directionPlan) setDirectorStatus('模板已更改；重新生成后才会替换当前项目。');
+    });
+    directorTemplates.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+      const buttons = Array.from(directorTemplates.querySelectorAll('[data-template]'));
+      const current = Math.max(0, buttons.indexOf(document.activeElement));
+      const direction = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1;
+      const next = buttons[(current + direction + buttons.length) % buttons.length];
+      event.preventDefault(); next.click(); next.focus();
+    });
+    directorAspects.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-aspect]'); if (!button) return;
+      selectedAspect = button.dataset.aspect; selectChoice(directorAspects, button, 'aria-pressed');
+      if (directionPlan) setDirectorStatus('画幅已更改；重新生成后才会替换当前项目。');
+    });
+    directorGenerate.addEventListener('click', generateDirection);
+    directorPreview.addEventListener('click', () => { startPlayback(); });
+    directorExport.addEventListener('click', () => {
+      exportProject();
+      setDirectorStatus(`已下载可编辑场景项目。桌面高质量视频可用 --project 与 --aspect ${selectedAspect} 导出。`);
+    });
+    window.addEventListener('signalfield:audio-loaded', (event) => {
+      const detail = event.detail || {};
+      if (!detail.file || detail.file === musicFile) return;
+      musicFile = detail.file; musicMeta = detail;
+      directorFileName.textContent = `${detail.name} · ${formatTime(detail.durationMs)}`;
+      directorGenerate.disabled = false;
+      setDirectorStatus('音乐已就绪。选择模板和画幅后，点击“分析并生成”。');
+    });
+  }
 
   safeLoad();
   render();
@@ -422,6 +619,9 @@
     overwrite: overwriteSelected,
     select: restoreScene,
     seek: (timeMs) => seekAndApply(timeMs, true),
+    play: startPlayback,
+    stop: () => stopPlayback(true),
+    generateMusicPlan: generateDirection,
     exportJSON: () => store.exportJSON(),
     importJSON(serialized) {
       const result = store.tryImportJSON(serialized);

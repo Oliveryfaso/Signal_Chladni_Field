@@ -2,20 +2,31 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { once } = require('node:events');
 const { spawn, spawnSync } = require('node:child_process');
-const { app, BrowserWindow } = require('electron');
+const SceneStudio = require('../app/scene-studio.js');
 
 const ROOT = path.join(__dirname, '..');
 const VISUALIZER_FILE = path.join(ROOT, 'app', 'index.html');
 const AUDIO_SAMPLE_RATE = 48000;
 const AUDIO_FFT_SIZE = 2048;
 const AUDIO_BANDS = 16;
+const PROJECT_REST_FRAME = Object.freeze({
+  bands: Object.freeze([0.18, 0.26, 0.38, 0.52, 0.62, 0.58, 0.48, 0.4, 0.34, 0.3, 0.26, 0.22, 0.18, 0.15, 0.12, 0.1]),
+  energy: 0.5,
+  sharpness: 0.45,
+  flat: 0.35
+});
 const STYLES = new Set(['sand', 'msand', 'cosmic', 'dcosmic']);
 const ROTATION_MODES = new Set(['single', 'tumble', 'precess']);
 const CODECS = new Set(['prores', 'h264']);
+const ASPECTS = Object.freeze({
+  '16:9': Object.freeze({ width: 1920, height: 1080 }),
+  '9:16': Object.freeze({ width: 1080, height: 1920 }),
+  '1:1': Object.freeze({ width: 1080, height: 1080 })
+});
 const FLAG_ARGS = new Set(['alpha', 'no-rotation', 'help']);
 const VALUE_ARGS = new Set([
-  'audio', 'codec', 'fps', 'height', 'light', 'output', 'particles', 'pattern', 'rotation',
-  'rotation-speed', 'seconds', 'seed', 'style', 'width'
+  'aspect', 'audio', 'codec', 'fps', 'height', 'light', 'output', 'particles', 'pattern', 'project',
+  'rotation', 'rotation-speed', 'seconds', 'seed', 'style', 'width'
 ]);
 
 const HELP = `Usage:
@@ -26,13 +37,15 @@ Required:
 
 Options:
   --codec <prores|h264>   Override codec inferred from the output extension.
+  --aspect <ratio>        16:9, 9:16, or 1:1; cannot be combined with width/height.
   --style <name>          sand, msand, cosmic, or dcosmic (default: cosmic).
   --width <pixels>        Native output width (default: 3840).
   --height <pixels>       Native output height (default: 2160).
   --fps <number>          Output frame rate (default: 60).
-  --seconds <number>      Duration in seconds (default: 10).
+  --seconds <number>      Duration in seconds (default: 10, or the project duration).
   --seed <integer>        Deterministic particle seed (default: 20260710).
   --pattern <json>        Captured pattern JSON; otherwise uses the Web showcase default.
+  --project <json>        Valid Signal Field Scene Studio project; drives the export timeline.
   --audio <file>          Drive every frame from this audio and include it in the output.
   --particles <0..1>      Particle-count scale (default: 0.15).
   --light <0..9>          3D lighting model; 0 is depth, 9 is sweep (default: 9).
@@ -74,24 +87,77 @@ function finiteNumber(value, fallback, label, min, max) {
   return number;
 }
 
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+function aspectDimensions(aspect) {
+  if (aspect == null) return null;
+  if (!hasOwn(ASPECTS, aspect)) throw new Error(`Unknown aspect: ${aspect}`);
+  return { ...ASPECTS[aspect] };
+}
+
+function loadSceneProject(file) {
+  const projectFile = path.resolve(file);
+  if (!fs.existsSync(projectFile) || !fs.statSync(projectFile).isFile()) {
+    throw new Error(`Scene project is unavailable: ${projectFile}`);
+  }
+  const size = fs.statSync(projectFile).size;
+  if (size > 5 * 1024 * 1024) throw new Error('Scene project must not exceed 5 MB');
+  const project = SceneStudio.importProject(fs.readFileSync(projectFile, 'utf8'));
+  if (project.timeline.durationMs <= 0 || !project.timeline.keyframes.length) {
+    throw new Error('Scene project requires a non-empty timeline with a positive duration');
+  }
+  return { file: projectFile, project };
+}
+
+function timelineSnapshotAt(project, timeMs) {
+  return SceneStudio.seekTimeline(project, timeMs);
+}
+
 function loadOptions(argv) {
   const args = parseArgs(argv);
   if (args.help) return { help: true };
   if (!args.output) throw new Error('--output is required');
 
+  const aspect = args.aspect || null;
+  const dimensions = aspectDimensions(aspect);
+  if (dimensions && (hasOwn(args, 'width') || hasOwn(args, 'height'))) {
+    throw new Error('--aspect cannot be combined with --width or --height');
+  }
+  if (args.project) {
+    const conflicting = ['style', 'pattern', 'particles', 'light', 'rotation', 'rotation-speed', 'no-rotation']
+      .filter((key) => hasOwn(args, key));
+    if (conflicting.length) throw new Error(`--project cannot be combined with --${conflicting[0]}`);
+  }
+
+  let project = null;
+  let projectFile = null;
+  let projectDurationSeconds = null;
+  let initialSnapshot = null;
+  if (args.project) {
+    const loaded = loadSceneProject(args.project);
+    project = loaded.project;
+    projectFile = loaded.file;
+    projectDurationSeconds = project.timeline.durationMs / 1000;
+    initialSnapshot = timelineSnapshotAt(project, 0).snapshot;
+    if (!initialSnapshot) throw new Error('Scene project has no snapshot at the start of its timeline');
+  }
+
   const output = path.resolve(args.output);
   const extension = path.extname(output).toLowerCase();
   const codec = args.codec || (extension === '.mp4' ? 'h264' : 'prores');
-  const style = args.style || 'cosmic';
-  const rotationMode = args.rotation || 'precess';
-  const width = Math.round(finiteNumber(args.width, 3840, 'width', 64, 8192));
-  const height = Math.round(finiteNumber(args.height, 2160, 'height', 64, 8192));
+  const style = initialSnapshot ? initialSnapshot.style : (args.style || 'cosmic');
+  const rotationMode = initialSnapshot ? initialSnapshot.rotationMode : (args.rotation || 'precess');
+  const width = Math.round(finiteNumber(args.width, dimensions ? dimensions.width : 3840, 'width', 64, 8192));
+  const height = Math.round(finiteNumber(args.height, dimensions ? dimensions.height : 2160, 'height', 64, 8192));
   const fps = finiteNumber(args.fps, 60, 'fps', 1, 240);
-  const seconds = finiteNumber(args.seconds, 10, 'seconds', 0.01, 3600);
+  const secondsExplicit = hasOwn(args, 'seconds');
+  const seconds = finiteNumber(args.seconds, projectDurationSeconds == null ? 10 : projectDurationSeconds, 'seconds', 0.01, 3600);
   const seed = Math.round(finiteNumber(args.seed, 20260710, 'seed', 1, 4294967295));
-  const particles = finiteNumber(args.particles, 0.15, 'particles', 0.01, 1);
-  const light = Math.round(finiteNumber(args.light, 9, 'light', 0, 9));
-  const rotationSpeed = finiteNumber(args['rotation-speed'], 1, 'rotation-speed', 0, 10);
+  const particles = finiteNumber(args.particles, initialSnapshot ? initialSnapshot.parameters.particles : 0.15, 'particles', 0.01, 1);
+  const light = Math.round(finiteNumber(args.light, initialSnapshot ? initialSnapshot.parameters.light : 9, 'light', 0, 9));
+  const rotationSpeed = finiteNumber(args['rotation-speed'], initialSnapshot ? initialSnapshot.parameters.rotationSpeed : 1, 'rotation-speed', 0, 10);
   const alpha = Boolean(args.alpha);
   const audio = args.audio ? path.resolve(args.audio) : null;
 
@@ -103,8 +169,11 @@ function loadOptions(argv) {
   if (codec === 'h264' && extension !== '.mp4') throw new Error('H.264 output must use a .mp4 extension');
   if (codec === 'prores' && extension !== '.mov') throw new Error('ProRes output must use a .mov extension');
   if (audio && (!fs.existsSync(audio) || !fs.statSync(audio).isFile())) throw new Error(`Audio file is unavailable: ${audio}`);
+  if (projectDurationSeconds != null && seconds > projectDurationSeconds + 1e-9) {
+    throw new Error(`seconds must not exceed the scene project duration (${projectDurationSeconds})`);
+  }
 
-  let pattern = null;
+  let pattern = initialSnapshot ? initialSnapshot.pattern : null;
   if (args.pattern) {
     const patternFile = path.resolve(args.pattern);
     pattern = JSON.parse(fs.readFileSync(patternFile, 'utf8'));
@@ -112,6 +181,7 @@ function loadOptions(argv) {
 
   return {
     alpha,
+    aspect,
     audio,
     codec,
     fps,
@@ -121,11 +191,16 @@ function loadOptions(argv) {
     output,
     particles,
     pattern,
-    rotation: !args['no-rotation'],
+    project,
+    projectFile,
+    projectDurationSeconds,
+    initialSnapshot,
+    rotation: initialSnapshot ? initialSnapshot.toggles.rotation : !args['no-rotation'],
     rotationMode,
     rotationSpeed,
     seed,
     seconds,
+    secondsExplicit,
     style,
     width
   };
@@ -182,6 +257,21 @@ function assertFfmpeg() {
   const probe = spawnSync(binary, ['-version'], { stdio: 'ignore' });
   if (probe.error || probe.status !== 0) throw new Error(`ffmpeg is unavailable: ${binary}`);
   return binary;
+}
+
+function probeAudioDuration(ffmpegBinary, audioFile) {
+  const inferred = path.isAbsolute(ffmpegBinary)
+    ? path.join(path.dirname(ffmpegBinary), process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe')
+    : 'ffprobe';
+  const binary = process.env.FFPROBE_PATH || inferred;
+  const result = spawnSync(binary, [
+    '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', audioFile
+  ], { encoding: 'utf8', maxBuffer: 1024 * 1024 });
+  const duration = Number(result.stdout && result.stdout.trim());
+  if (result.error || result.status !== 0 || !Number.isFinite(duration) || duration <= 0) {
+    throw new Error(`Audio duration is unavailable: ${audioFile}`);
+  }
+  return duration;
 }
 
 function decodeAudioSamples(ffmpegBinary, options) {
@@ -340,6 +430,7 @@ async function waitForPattern(win, target) {
 async function configureRenderer(win, options) {
   const config = JSON.stringify({
     alpha: options.alpha,
+    initialSnapshot: options.initialSnapshot,
     light: options.light,
     particles: options.particles,
     pattern: options.pattern,
@@ -351,11 +442,21 @@ async function configureRenderer(win, options) {
 
   const targetPattern = await win.webContents.executeJavaScript(`(() => {
     const config = ${config};
-    window.soundMotionNative.setStyle(config.style);
-    window.soundMotionNative.setParam('particles', config.particles);
-    window.soundMotionNative.setParam('light', config.light);
-    window.soundMotionNative.setRotationMode(config.rotationMode);
-    window.soundMotionNative.setParam('rotationSpeed', config.rotationSpeed);
+    const snapshot = config.initialSnapshot;
+    window.soundMotionNative.setStyle(snapshot ? snapshot.style : config.style);
+    if (snapshot) {
+      window.soundMotionNative.setSampleMode(snapshot.sampleMode);
+      window.soundMotionNative.setRotationMode(snapshot.rotationMode);
+      window.soundMotionNative.setSolidShape(snapshot.solidShape, snapshot.parameters.faces, false);
+      Object.keys(snapshot.parameters).forEach((name) => window.soundMotionNative.setParam(name, snapshot.parameters[name]));
+      window.soundMotionNative.setBoolean('symmetry', snapshot.toggles.symmetry);
+      window.soundMotionNative.setBoolean('frame', snapshot.toggles.frame);
+    } else {
+      window.soundMotionNative.setParam('particles', config.particles);
+      window.soundMotionNative.setParam('light', config.light);
+      window.soundMotionNative.setRotationMode(config.rotationMode);
+      window.soundMotionNative.setParam('rotationSpeed', config.rotationSpeed);
+    }
     window.soundMotionNative.setTransparent(config.alpha);
     window.soundMotionTest.renderStill();
     const pattern = config.pattern || window.soundMotionTest.webDefaultPattern(config.style);
@@ -365,13 +466,55 @@ async function configureRenderer(win, options) {
 
   await waitForPattern(win, targetPattern);
 
+  const initialSnapshot = JSON.stringify(options.initialSnapshot);
   return win.webContents.executeJavaScript(`(() => {
+    const exportAlpha = ${options.alpha};
     window.soundMotionNative.setBoolean('rotation', ${options.rotation});
+    if (${Boolean(options.project)}) {
+      window.__signalFieldExportLastSnapshot = ${initialSnapshot};
+      window.__signalFieldApplyExportSnapshot = (snapshot) => {
+        const Studio = window.SignalFieldSceneStudio;
+        if (!Studio || !snapshot) throw new Error('Scene Studio export bridge is unavailable');
+        const recipe = Studio.createSoundMotionRecipe(snapshot);
+        const validation = Studio.validateSoundMotionRecipe(recipe);
+        if (!validation.valid) throw new Error(validation.errors.join(' '));
+        const previous = window.__signalFieldExportLastSnapshot;
+        const changed = (path) => {
+          const read = (value) => path.reduce((current, key) => current == null ? current : current[key], value);
+          return JSON.stringify(read(previous)) !== JSON.stringify(read(snapshot));
+        };
+        recipe.commands.forEach((command) => {
+          let apply = !previous;
+          if (command.method === 'setStyle') apply = apply || changed(['style']);
+          else if (command.method === 'setSampleMode') apply = apply || changed(['sampleMode']);
+          else if (command.method === 'setRotationMode') apply = apply || changed(['rotationMode']);
+          else if (command.method === 'setSolidShape') apply = apply || changed(['solidShape']) || changed(['parameters', 'faces']);
+          else if (command.method === 'setParam') apply = apply || changed(['parameters', command.args[0]]);
+          else if (command.method === 'setBoolean') apply = apply || changed(['toggles', command.args[0]]);
+          else if (command.method === 'applyPatternSpec') apply = apply || changed(['pattern']);
+          else if (command.method === 'setTransparent') apply = false;
+          if (apply) window.soundMotionNative[command.method](...command.args);
+        });
+        window.soundMotionNative.setTransparent(exportAlpha);
+        window.__signalFieldExportLastSnapshot = snapshot;
+        return true;
+      };
+      window.soundMotionTest.forcePlayingForTest();
+    }
     return {...window.soundMotionTest.state(), pattern:JSON.parse(window.soundMotionNative.exportPatternJSON())};
   })()`);
 }
 
+async function applyProjectTimeline(win, project, timeMs) {
+  const result = timelineSnapshotAt(project, timeMs);
+  if (!result.snapshot) throw new Error(`Scene project has no snapshot at ${result.timeMs} ms`);
+  const snapshot = JSON.stringify(result.snapshot);
+  await win.webContents.executeJavaScript(`window.__signalFieldApplyExportSnapshot(${snapshot});`);
+  return result;
+}
+
 async function createRenderWindow(options) {
+  const { BrowserWindow } = require('electron');
   const win = new BrowserWindow({
     width: options.width,
     height: options.height,
@@ -419,6 +562,12 @@ async function writeFrame(ffmpeg, png) {
 
 async function render(options) {
   const ffmpegBinary = assertFfmpeg();
+  if (options.audio && options.secondsExplicit) {
+    const audioDuration = probeAudioDuration(ffmpegBinary, options.audio);
+    if (options.seconds > audioDuration + (1 / options.fps)) {
+      throw new Error(`seconds must not exceed the audio duration (${audioDuration.toFixed(3)})`);
+    }
+  }
   const audioFrames = options.audio ? analyzeAudioFrames(ffmpegBinary, options) : null;
   fs.mkdirSync(path.dirname(options.output), { recursive: true });
   const win = await createRenderWindow(options);
@@ -442,7 +591,7 @@ async function render(options) {
     if (state.transparent !== options.alpha) {
       throw new Error(`Renderer transparency mismatch: expected=${options.alpha}, actual=${state.transparent}`);
     }
-    if (audioFrames) {
+    if (audioFrames || options.project) {
       await win.webContents.executeJavaScript('window.soundMotionTest.beginAudioExportForTest()');
     }
 
@@ -452,9 +601,15 @@ async function render(options) {
 
     const progressEvery = Math.max(1, Math.round(options.frameCount / 20));
     for (let frame = 0; frame < options.frameCount; frame += 1) {
-      const featureFrame = audioFrames ? JSON.stringify(audioFrames[frame]) : 'null';
+      if (options.project) {
+        await applyProjectTimeline(win, options.project, (frame * 1000) / options.fps);
+      }
+      const featureFrame = audioFrames
+        ? JSON.stringify(audioFrames[frame])
+        : (options.project ? JSON.stringify(PROJECT_REST_FRAME) : 'null');
+      const idle = !audioFrames && !options.project;
       await win.webContents.executeJavaScript(
-        `window.soundMotionTest.exportTickForTest(${1 / options.fps}, ${audioFrames ? 'false' : 'true'}, ${featureFrame});`
+        `window.soundMotionTest.exportTickForTest(${1 / options.fps}, ${idle}, ${featureFrame});`
       );
       const png = await captureCanvasPng(win);
       await writeFrame(ffmpeg, png);
@@ -474,24 +629,38 @@ async function render(options) {
   }
 }
 
-app.commandLine.appendSwitch('force-device-scale-factor', '1');
-app.commandLine.appendSwitch('disable-frame-rate-limit');
-app.on('window-all-closed', () => {});
+function runCli() {
+  const { app } = require('electron');
+  app.commandLine.appendSwitch('force-device-scale-factor', '1');
+  app.commandLine.appendSwitch('disable-frame-rate-limit');
+  app.on('window-all-closed', () => {});
 
-app.whenReady().then(async () => {
-  const options = loadOptions(process.argv.slice(2));
-  if (options.help) {
-    console.log(HELP);
-    return;
-  }
-  console.log(
-    `Exporting ${options.width}x${options.height}, ${options.fps} fps, ${options.frameCount} frames, ${options.codec}${options.audio ? ', audio-driven' : ''}`
-  );
-  await render(options);
-}).then(() => {
-  app.quit();
-}).catch((error) => {
-  console.error(error.message || error);
-  console.error('\n' + HELP);
-  app.exit(1);
-});
+  app.whenReady().then(async () => {
+    const options = loadOptions(process.argv.slice(2));
+    if (options.help) {
+      console.log(HELP);
+      return;
+    }
+    console.log(
+      `Exporting ${options.width}x${options.height}, ${options.fps} fps, ${options.frameCount} frames, ${options.codec}${options.audio ? ', audio-driven' : ''}${options.project ? ', scene-project' : ''}`
+    );
+    await render(options);
+  }).then(() => {
+    app.quit();
+  }).catch((error) => {
+    console.error(error.message || error);
+    console.error('\n' + HELP);
+    app.exit(1);
+  });
+}
+
+module.exports = {
+  ASPECTS,
+  aspectDimensions,
+  loadOptions,
+  loadSceneProject,
+  parseArgs,
+  timelineSnapshotAt
+};
+
+if (require.main === module) runCli();

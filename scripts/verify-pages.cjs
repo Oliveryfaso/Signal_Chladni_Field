@@ -117,6 +117,10 @@ async function main() {
         sourceLink:document.getElementById('sourceLink')?.href,
         socialImage:document.querySelector('meta[property="og:image"]')?.content,
         heading:document.querySelector('h1.title')?.textContent,
+        creatorHref:document.querySelector('.hero-cta')?.getAttribute('href'),
+        creatorHeight:document.querySelector('.hero-cta')?.getBoundingClientRect().height,
+        advancedNote:document.querySelector('.hero-note')?.textContent,
+        hasSphereControl:Boolean(document.querySelector('[data-control="solidshape"] [data-value="sphere"]')),
         engineTitle:frame.contentDocument.title,
         engineHeading:frame.contentDocument.querySelector('header h1')?.textContent,
         downloadButton:Boolean(document.getElementById('exportBtn')),
@@ -129,9 +133,12 @@ async function main() {
     }
     if (!initial.audio.includes('演示信号')) throw new Error(`Unexpected Pages demo source: ${initial.audio}`);
     if (initial.source !== '/app/index.html' || !initial.dock) throw new Error(`Invalid Pages shell: ${JSON.stringify(initial)}`);
-    if (initial.title !== 'Signal Field — 3D Audio Resonance Visualizer' || initial.heading !== 'Signal Field' ||
+    if (initial.title !== 'Signal Field — 3D Audio Resonance Visualizer' || !['把一首歌变成 3D 粒子短片','Turn a song into a 3D particle film'].includes(initial.heading) ||
         initial.engineTitle !== 'Signal Field' || initial.engineHeading !== 'Signal Field' || initial.hasLegacyName) {
       throw new Error(`Invalid Pages product name: ${JSON.stringify(initial)}`);
+    }
+    if (initial.creatorHref !== 'app/index.html#music-director' || initial.creatorHeight < 44 || !initial.advancedNote || !initial.hasSphereControl) {
+      throw new Error(`Pages creator entry is incomplete: ${JSON.stringify(initial)}`);
     }
     if (!initial.canonical.includes('/Signal_Chladni_Field/') || !initial.sourceLink.includes('/Oliveryfaso/Signal_Chladni_Field') || !initial.socialImage.includes('/desktop/assets/signal-field-icon.png')) {
       throw new Error(`Pages public metadata/source links are invalid: ${JSON.stringify(initial)}`);
@@ -201,6 +208,42 @@ async function main() {
         ['ready','fallback','disabled','lost'].includes(window.signalFieldGpuController.state().status)`,
       'renderer runtime status'
     );
+    await win.webContents.executeJavaScript(`(() => {
+      const sampleRate=8000, seconds=4, count=sampleRate*seconds, bytes=new ArrayBuffer(44+count*2), view=new DataView(bytes);
+      const text=(offset,value)=>{ for(let i=0;i<value.length;i++)view.setUint8(offset+i,value.charCodeAt(i)); };
+      text(0,'RIFF'); view.setUint32(4,36+count*2,true); text(8,'WAVE'); text(12,'fmt '); view.setUint32(16,16,true);
+      view.setUint16(20,1,true); view.setUint16(22,1,true); view.setUint32(24,sampleRate,true); view.setUint32(28,sampleRate*2,true);
+      view.setUint16(32,2,true); view.setUint16(34,16,true); text(36,'data'); view.setUint32(40,count*2,true);
+      for(let i=0;i<count;i++){ const phase=i%(sampleRate/2), value=phase<80?(1-phase/80)*0.9:Math.sin(i/sampleRate*Math.PI*2*220)*0.08; view.setInt16(44+i*2,Math.max(-32767,Math.min(32767,Math.round(value*32767))),true); }
+      const file=new File([bytes],'pages-120bpm.wav',{type:'audio/wav'});
+      return window.soundMotionNative.loadAudioFile(file);
+    })()`);
+    await waitFor(win, '!document.getElementById("directorGenerate").disabled', 'music director audio readiness');
+    await win.webContents.executeJavaScript('document.getElementById("directorGenerate").click()');
+    await waitFor(
+      win,
+      'document.getElementById("directorStatus").textContent.includes("已生成") && !document.getElementById("directorPreview").disabled',
+      'automatic music direction',
+      20_000
+    );
+    const musicDirection = await win.webContents.executeJavaScript(`(() => {
+      const state=window.sceneStudioController.state(), project=state.project;
+      return {
+        title:project.title,scenes:project.scenes.length,keyframes:project.timeline.keyframes.length,durationMs:project.timeline.durationMs,
+        source:window.soundMotionTest.state().audioSource,fileLoaded:window.soundMotionTest.state().audioFileLoaded,
+        cueCount:document.querySelectorAll('.director-cue').length,
+        previewDisabled:document.getElementById('directorPreview').disabled,
+        exportDisabled:document.getElementById('directorExport').disabled,
+        valid:window.SignalFieldSceneStudio.validateProject(project).valid
+      };
+    })()`);
+    if (!musicDirection.valid || musicDirection.scenes < 1 || musicDirection.scenes !== musicDirection.keyframes || musicDirection.cueCount !== musicDirection.scenes ||
+      musicDirection.durationMs !== 4000 || musicDirection.source !== 'file' || !musicDirection.fileLoaded || musicDirection.previewDisabled || musicDirection.exportDisabled) {
+      throw new Error(`Music director did not create a usable local project: ${JSON.stringify(musicDirection)}`);
+    }
+    await win.webContents.executeJavaScript('document.getElementById("directorPreview").click()');
+    await waitFor(win, 'window.sceneStudioController.state().playbackRunning && window.soundMotionTest.state().audioSource==="file" && window.soundMotionTest.state().playing', 'music-synchronised timeline preview');
+    await win.webContents.executeJavaScript('window.sceneStudioController.stop()');
     const productSurfaces = await win.webContents.executeJavaScript(`({
       plateMode:document.querySelector('[data-role="mode-value"]')?.textContent,
       plateFrequency:document.querySelector('[data-role="natural-value"]')?.textContent,
@@ -270,13 +313,16 @@ async function main() {
     await new Promise((resolve) => setTimeout(resolve, 80));
     const mobileShapeControl = await win.webContents.executeJavaScript(`(() => {
       const segment=document.getElementById('solidshape'), segmentRect=segment.getBoundingClientRect();
+      const director=document.getElementById('musicDirector').getBoundingClientRect();
       const buttons=Array.from(segment.querySelectorAll('button')).map(button=>{
         const rect=button.getBoundingClientRect(); return {left:rect.left,right:rect.right,width:rect.width,height:rect.height};
       });
-      return {viewport:innerWidth,segment:{left:segmentRect.left,right:segmentRect.right,width:segmentRect.width},buttons};
+      const directorActions=Array.from(document.querySelectorAll('.director-action')).map(button=>button.getBoundingClientRect().height);
+      return {viewport:innerWidth,documentWidth:document.documentElement.scrollWidth,director:{left:director.left,right:director.right},directorActions,segment:{left:segmentRect.left,right:segmentRect.right,width:segmentRect.width},buttons};
     })()`);
     if (mobileShapeControl.segment.left < 0 || mobileShapeControl.segment.right > mobileShapeControl.viewport + 0.5 ||
-      mobileShapeControl.buttons.some((button) => button.width <= 0 || button.height < 44 || button.left < mobileShapeControl.segment.left - 0.5 || button.right > mobileShapeControl.segment.right + 0.5)) {
+      mobileShapeControl.documentWidth > mobileShapeControl.viewport + 1 || mobileShapeControl.director.left < 0 || mobileShapeControl.director.right > mobileShapeControl.viewport + 0.5 ||
+      mobileShapeControl.directorActions.some((height) => height < 44) || mobileShapeControl.buttons.some((button) => button.width <= 0 || button.height < 44 || button.left < mobileShapeControl.segment.left - 0.5 || button.right > mobileShapeControl.segment.right + 0.5)) {
       throw new Error(`GPU shape selector overflows its mobile surface: ${JSON.stringify(mobileShapeControl)}`);
     }
     win.setContentSize(1280, 800);
@@ -305,7 +351,7 @@ async function main() {
     const redirect = await win.webContents.executeJavaScript('({path:location.pathname,search:location.search,hash:location.hash})');
     if (redirect.search !== '?source=legacy' || redirect.hash !== '#demo') throw new Error(`Legacy redirect lost URL state: ${JSON.stringify(redirect)}`);
     if (errors.length) throw new Error(`Browser console errors: ${errors.join(' | ')}`);
-    console.log('PASS Pages branding, generated demo signal, Plate Lab defaults, GPU regular/random/sphere boundaries, per-style GPU mechanics, truthful WebGPU/Canvas runtime status, parity Canvas lock, shared Web default pattern, per-style details, bilingual UI, licenses, and /website/ redirect');
+    console.log('PASS creator entry, local music analysis, automatic Scene Studio direction, music-synchronised preview, mobile creator layout, Plate Lab defaults, GPU regular/random/sphere boundaries, per-style GPU mechanics, truthful WebGPU/Canvas runtime status, parity Canvas lock, bilingual UI, licenses, and /website/ redirect');
   } finally {
     if (!win.isDestroyed()) win.destroy();
     await new Promise((resolve) => server.close(resolve));

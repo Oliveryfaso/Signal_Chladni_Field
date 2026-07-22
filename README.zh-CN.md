@@ -9,14 +9,14 @@
 </p>
 
 <p align="center">
-  <strong>本地优先的信号、数据与动态场可视化器</strong>
+  <strong>本地优先的音乐视觉短片自动创作工具</strong>
 </p>
 
 <p align="center"><sub>签名和公证状态以具体发行版本为准；开发构建不可视为已公证版本。</sub></p>
 
 # Signal Field
 
-把声音、数据和动态信号投进三维共振场。粒子不是贴图或预录动画，而是在模态共振、惯性迁移和三维投影中持续形成新的节面结构。
+Signal Field 把一首本地音乐自动编排成可编辑的 3D 粒子短片时间线。选择模板、画幅和时长后，它会在本机分析音乐、生成场景序列，并让画面与原始音频同步预览。粒子不是贴图或预录动画，而是在模态共振、惯性迁移和三维投影中持续形成新的节面结构。
 
 这个仓库目前包含可直接部署的 Web Demo，以及可从源码构建的 Mac 音乐可视化应用和 Mac 屏幕保护程序 / 锁屏动画。Windows 版作为社区方向，正在招募开发者贡献。
 
@@ -26,7 +26,7 @@
 
 | 应用 | 状态 | 说明 |
 | --- | --- | --- |
-| Web Demo | [在线演示](https://oliveryfaso.github.io/Signal_Chladni_Field/) | GitHub Pages 部署，程序生成演示信号驱动动态声沙和动态宇宙网 |
+| Web 创作器 | [在线使用](https://oliveryfaso.github.io/Signal_Chladni_Field/) | 上传本地音乐、自动生成编排、随音乐预览并导出可编辑项目 |
 | Mac 音乐可视化应用 | 可从源码构建 | Electron 桌面应用，用户授权后跟随系统音频，支持透明浮层和全屏；不宣称已有公证安装包 |
 | Mac 屏保 / 锁屏动画 | 可从源码构建 | 原生 Metal 实现，可在本机完成构建和安装 |
 | Windows 音乐可视化应用 | 招募贡献者 | 已有跨平台 Electron 与打包基础，尚需完成 Windows 适配、设备测试和正式发布 |
@@ -45,13 +45,30 @@
 
 四种模式分别记住当前会话中的细节调整值。默认粒子密度为 `15%`。动态模式带低频模态保护，低频占主导时仍保留可见的结构细节。
 
-## Web 展示页
+## 制作一条音乐视觉短片
+
+1. 打开 Web 创作器并选择本地音频；浏览器不会上传音乐。
+2. 选择“星云轨道”“脉冲切片”或“声沙叙事”，再选择 `16:9`、`9:16` 或 `1:1` 画幅和整首/短时长。
+3. 点击“分析并生成”。Signal Field 会估计音乐强弱、频谱明暗、变化强度、速度与段落，并生成经过校验的场景时间线。
+4. 随原始音乐预览，在下方高级工作台调整任意场景，再导出可编辑项目 JSON。
+
+最终视频可使用原始音频和导出的项目从桌面命令行渲染：
+
+```bash
+npm run export:video -- --project signal-field-project.json --audio song.mp3 \
+  --aspect 9:16 --output signal-field-video.mp4
+```
+
+`.mp4` 默认生成 H.264，输出名为 `.mov` 时默认生成 ProRes。网页版目前导出可编辑项目，而不是直接编码视频。确定性视频导出使用完整 Canvas 渲染器，不包含额外叠加的 WebGPU 增强层。
+
+## Web 创作器与高级工作台
 
 仓库根目录的 `index.html` 就是发布入口。它复用 `app/index.html` 的真实视觉内核，不维护第二套粒子实现。
 
 **[打开在线 Web Demo](https://oliveryfaso.github.io/Signal_Chladni_Field/)**
 
-- 底栏支持中文 / English 即时切换，并记住用户选择。
+- 首屏创作区完成本地上传、三种编排模板、三种输出画幅、自动时间线、音频同步预览和可编辑项目导出。
+- 下方完整可视化器支持中文 / English 即时切换，并记住用户选择。
 - 支持随机图案、全屏、暂停旋转和拖拽观察。
 - 高级面板提供进动 / 单轴 / 翻滚、转速、缩放、细节、粒子、打光和立体形状控制。
 - 薄板共振实验用真实矩形薄板解析模态展示节点、理论频率和激振耦合，并把结果映射到原有 3D 粒子场；映射不会切换正在使用的音频或数据源。
@@ -91,12 +108,14 @@ npm run verify:pages
 
 ## 应用能力边界
 
-| 能力 | Web Demo | Mac 音乐可视化 | Mac 屏保 / 锁屏动画 |
+| 能力 | Web 创作器 | Mac 音乐可视化 | Mac 屏保 / 锁屏动画 |
 | --- | --- | --- | --- |
 | 动态声沙 / 动态宇宙网 | 支持 | 支持 | 不启用音频分析 |
 | 模态声沙 / 宇宙网 | 支持 | 支持 | 支持 |
 | 程序生成演示信号 | 支持 | 支持 | 不需要音频 |
 | 用户音频文件 / 麦克风 | 浏览器内支持 | 支持 | 不支持 |
+| 自动音乐编排 / 可编辑项目 | 本地音频文件支持 | 可通过桌面 CLI 渲染 Web 项目 | 不支持 |
+| H.264 / ProRes 视频 | 先导出项目，再用桌面 CLI | 确定性 CLI 支持 | 不支持 |
 | 系统音频 | 浏览器不提供通用接口 | 用户主动授权后支持 | 不支持 |
 | 透明浮层与 menu bar | 不支持 | 支持 | 不适用 |
 | WebGPU Compute 粒子增强 | 兼容浏览器支持，自动回退 | 暂锁定 Canvas | 不适用 |
@@ -135,6 +154,7 @@ Windows 音乐可视化应用目前不作为已完成发布物。仓库已经具
 ```text
 index.html                  GitHub Pages / 本地 Web 展示壳
 app/index.html              粒子物理、音频分析、Canvas 渲染真源
+app/music-director.js       本地音乐特征分析与确定性自动编排计划
 app/plate-lab-core.js       薄板模态、频响、网格采样和安全映射核心
 app/plate-lab-ui.js         触控/键盘薄板实验与节点图
 app/scene-studio.js         场景、项目、关键帧与安全配方核心
@@ -143,6 +163,7 @@ app/renderer-capabilities.js 渲染能力、降级与设备丢失状态
 app/webgpu-particle-backend.js WGSL Compute/Render、双缓冲和 64K/128K 粒子后端
 app/webgpu-integration.js    Canvas 主视觉与 WebGPU 增强层的运行时接入
 scripts/verify-webgpu-integration.cjs 形状/力学桥接集成验证
+scripts/export-video.cjs    项目、音频和画幅驱动的 H.264 / ProRes 确定性导出
 desktop/                    Electron 主进程、控制面板和系统音频桥
 macos-screensaver/          原生 Metal 屏保
 scripts/build-pages.sh      最小静态发布 artifact
@@ -159,6 +180,8 @@ npm run smoke
 npm run verify:web-audio
 npm run verify:pages
 npm run verify:scene-studio
+npm run verify:music-director
+npm run verify:video-export-options
 npm run verify:plate-lab
 npm run verify:renderer-capabilities
 npm run verify:webgpu
@@ -170,6 +193,10 @@ npm run verify:mac-parity
 
 ```bash
 npm run capture:release-media
+npm run export:video -- --project signal-field-project.json --audio song.mp3 \
+  --aspect 9:16 --output exports/signal-field-music-video.mp4
+
+# 也可以不使用场景项目，手动指定单个视觉：
 npm run export:video -- --output exports/signal-field-cosmic-demo.mp4 \
   --style cosmic --width 1280 --height 720 --fps 30 --seconds 6 \
   --codec h264 --rotation precess --rotation-speed 1 --seed 20260711
