@@ -142,6 +142,7 @@ app/scene-studio-ui.js      Scene Studio, timeline, and local project interactio
 app/renderer-capabilities.js Renderer capability, fallback, and device-loss state
 app/webgpu-particle-backend.js WGSL compute/render, ping-pong buffers, and 64K/128K particles
 app/webgpu-integration.js    Runtime bridge between the Canvas visual and WebGPU enhancement layer
+scripts/verify-webgpu-integration.cjs Shape/force bridge integration verification
 desktop/                    Electron main process, controls, and system-audio bridge
 macos-screensaver/          Native Metal screen saver
 scripts/build-pages.sh      Minimal static publishing artifact
@@ -161,6 +162,7 @@ npm run verify:scene-studio
 npm run verify:plate-lab
 npm run verify:renderer-capabilities
 npm run verify:webgpu
+npm run verify:webgpu-integration
 npm run verify:mac-parity
 ```
 

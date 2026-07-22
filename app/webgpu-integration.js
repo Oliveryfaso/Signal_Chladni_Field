@@ -163,7 +163,7 @@
         actual: 'canvas+webgpu', status: 'ready', quality: backendState.particleTier,
         simulation: 'modal-3d',
         modePair: `(${modeA.l},${modeA.m},${modeA.n}) + (${modeB.l},${modeB.m},${modeB.n})`,
-        shapeKind: snapshot.shape && snapshot.shape.type || 'cube',
+        shapeKind: backendState.shape && backendState.shape.type || snapshot.shape && snapshot.shape.type || 'cube',
         particleCount: backendState.particleCount,
         framesSubmitted: backendState.framesSubmitted,
         fallbackReason: null
@@ -192,13 +192,15 @@
     update({ actual: 'canvas', status: 'initializing', simulation: 'modal-3d-pending', modePair: null, shapeKind: null, particleCount: 0, framesSubmitted: 0, fallbackReason: null });
     let created;
     try {
+      const initialSnapshot = bridge.snapshot();
       created = await backendApi.create(canvas, {
         environment: globalScope,
         particleTier: 'adaptive',
         autoStart: false,
         alphaMode: 'premultiplied',
         seed: 20260722,
-        parameters: { backgroundColor: [0, 0, 0, 0] }
+        shape: initialSnapshot.shape,
+        parameters: Object.assign(parametersFromSnapshot(initialSnapshot), { backgroundColor: [0, 0, 0, 0] })
       });
     } catch (error) {
       if (token === generation) fallBack(String(error && error.message || error), 'fallback');

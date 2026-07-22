@@ -142,6 +142,7 @@ app/scene-studio-ui.js      场景工作室、时间线和本地项目交互
 app/renderer-capabilities.js 渲染能力、降级与设备丢失状态
 app/webgpu-particle-backend.js WGSL Compute/Render、双缓冲和 64K/128K 粒子后端
 app/webgpu-integration.js    Canvas 主视觉与 WebGPU 增强层的运行时接入
+scripts/verify-webgpu-integration.cjs 形状/力学桥接集成验证
 desktop/                    Electron 主进程、控制面板和系统音频桥
 macos-screensaver/          原生 Metal 屏保
 scripts/build-pages.sh      最小静态发布 artifact
@@ -161,6 +162,7 @@ npm run verify:scene-studio
 npm run verify:plate-lab
 npm run verify:renderer-capabilities
 npm run verify:webgpu
+npm run verify:webgpu-integration
 npm run verify:mac-parity
 ```
 

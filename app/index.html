@@ -81,7 +81,7 @@
   footer{color:var(--muted);font-size:12px;margin-top:38px;border-top:1px solid var(--line);padding-top:16px}
   kbd{font:inherit;font-size:11px;background:#1a1f25;border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--ink)}
   @media (max-width:780px){.grid{grid-template-columns:repeat(2,1fr)}.plate-frame{height:56vh;min-height:320px}.studio-head{display:block}.studio-actions{justify-content:flex-start;margin-top:12px}.studio-timeline{grid-template-columns:auto minmax(120px,1fr)}.timeline-readout{grid-column:1/-1;text-align:left;order:3}}
-  @media (max-width:520px){.grid{grid-template-columns:1fr}body{padding:28px 14px 60px}.scene-studio{padding:15px}.studio-actions .studio-btn{flex:1}.scene-rail{grid-template-columns:1fr}.studio-timeline{grid-template-columns:1fr}.studio-timeline .studio-btn{width:100%}.timeline-readout{grid-column:auto;order:initial;text-align:left}.renderer-capability{width:100%;margin-left:0}.renderer-capability summary{display:inline-block}.renderer-cap-panel{position:static;width:100%;margin-top:8px}.renderer-cap-panel button{min-height:44px}}
+  @media (max-width:520px){.grid{grid-template-columns:1fr}body{padding:28px 14px 60px}.scene-studio{padding:15px}.studio-actions .studio-btn{flex:1}.scene-rail{grid-template-columns:1fr}.studio-timeline{grid-template-columns:1fr}.studio-timeline .studio-btn{width:100%}.timeline-readout{grid-column:auto;order:initial;text-align:left}.renderer-capability{width:100%;margin-left:0}.renderer-capability summary{display:inline-block}.renderer-cap-panel{position:static;width:100%;margin-top:8px}.renderer-cap-panel button{min-height:44px}#solidshape{width:100%;display:grid;grid-template-columns:1.55fr 1fr .7fr;border-radius:14px}#solidshape button{min-width:0;min-height:44px;padding:8px 7px;line-height:1.25}}
   body.native-overlay,body.parity-test{padding:0;background:transparent;overflow:hidden}
   body.native-overlay .wrap,body.parity-test .wrap{max-width:none;width:100vw;height:100vh;margin:0}
   body.native-overlay header,body.native-overlay .inputs,body.native-overlay .tuners,body.native-overlay .transport,body.native-overlay h2,body.native-overlay .lede,body.native-overlay .grid,body.native-overlay #fieldLab,body.native-overlay #sceneStudio,body.native-overlay footer,
@@ -177,7 +177,7 @@
 
     <div class="tuners">
       <span class="tlab" style="color:var(--node)">立体</span>
-      <div class="seg" id="solidshape"><button data-shape="regular" class="on">正 N 面体</button><button data-shape="random">不规则 N 面体</button></div>
+      <div class="seg" id="solidshape"><button data-shape="regular" class="on">正 / 均匀多面体</button><button data-shape="random">随机多面体</button><button data-shape="sphere">球体</button></div>
       <button id="polyRefresh" class="mini" disabled>刷新随机</button>
       <label class="tlab">N <input type="range" id="polyfaces" min="4" max="32" step="1" value="8"><span class="val" id="polyval">8</span></label>
     </div>
@@ -295,8 +295,8 @@ const MOTION_PARAM=URL_PARAMS.get('motion');
 let ROT_MODE=['single','tumble','precess'].includes(MOTION_PARAM)?MOTION_PARAM:'single';
 let ROT_SPEED=1;            // rotation speed (rad/s-ish); 0 = stopped
 let ZOOM_3D=3;              // projection zoom; redraws vectors/particles instead of scaling the bitmap canvas
-let SOLID_SHAPE='regular';  // 3D boundary: regular or random N-face convex solid; N>16 becomes round
-let POLY_N=8;               // adjustable face-count target; 4..16 = polyhedron, >16 = round
+let SOLID_SHAPE='regular';  // 3D boundary: regular/uniform, random convex, or explicit sphere
+let POLY_N=8;               // adjustable face-count target; exact Platonic normals at 4/6/8/12/20
 let POLY_SEED=1;            // refreshable seed for the random polyhedron option
 let FRAME=false;            // draw the green frame lines (cube wireframe / sheet border) — user-toggleable
 document.getElementById('detail').value=String(DETAIL_SCALE);
@@ -947,6 +947,12 @@ function polyNormals(n,shape,seed){
     for(const x of [-1,1])for(const y of [-p,p])out.push(norm3([x,y,0]));
     for(const x of [-p,p])for(const z of [-1,1])out.push(norm3([x,0,z]));
     return out; }
+  if(n===20){ const p=(1+Math.sqrt(5))/2, q=1/p, out=[];
+    for(const x of [-1,1])for(const y of [-1,1])for(const z of [-1,1])out.push(norm3([x,y,z]));
+    for(const a of [-1,1])for(const b of [-1,1]){
+      out.push(norm3([0,a*q,b*p]),norm3([a*q,b*p,0]),norm3([b*p,0,a*q]));
+    }
+    return out; }
   const out=[], ga=PI*(3-Math.sqrt(5));
   for(let i=0;i<n;i++){ const z=1-2*(i+0.5)/n, r=Math.sqrt(Math.max(0,1-z*z)), a=i*ga; out.push([r*Math.cos(a),z,r*Math.sin(a)]); }
   return out;
@@ -957,7 +963,7 @@ function solvePlanes(a,b,c,da,db,dc){
   return [(bc[0]*da+ca[0]*db+ab[0]*dc)/det,(bc[1]*da+ca[1]*db+ab[1]*dc)/det,(bc[2]*da+ca[2]*db+ab[2]*dc)/det];
 }
 function makePolyGeometry(n,shape='regular',seed=1){
-  n=clampPolyN(n); const round=n>16, key=(round?'round':shape)+':'+n+':'+(shape==='random'?seed:0);
+  n=clampPolyN(n); const round=shape==='sphere'||(shape==='regular'&&n>16&&n!==20), key=(round?'round':shape)+':'+n+':'+(shape==='random'?seed:0);
   if(POLY_GEOM_CACHE.has(key)) return POLY_GEOM_CACHE.get(key);
   if(round){ const geom={round:true,r:0.48,verts:[],edges:[],normals:[],ds:[]}; POLY_GEOM_CACHE.set(key,geom); return geom; }
   const normals=polyNormals(n,shape,seed), rnd=seededRand(seed+97), ds=normals.map(()=>shape==='random'?0.255+rnd()*0.075:0.29), verts=[], ids=new Map(), eps=1e-4;
@@ -2180,8 +2186,8 @@ updRval();
 const shapeSeg=document.getElementById('solidshape'), polyInput=document.getElementById('polyfaces'), polyVal=document.getElementById('polyval'), polyRefresh=document.getElementById('polyRefresh');
 function refreshSolidControls(){
   document.querySelectorAll('#solidshape button').forEach(b=>b.classList.toggle('on',b.dataset.shape===SOLID_SHAPE));
-  polyInput.value=String(POLY_N); polyVal.textContent=POLY_N>16?'圆形':String(POLY_N);
-  polyRefresh.disabled=SOLID_SHAPE!=='random'||POLY_N>16;
+  polyInput.value=String(POLY_N); polyInput.disabled=SOLID_SHAPE==='sphere'; polyVal.textContent=SOLID_SHAPE==='sphere'?'球体':String(POLY_N);
+  polyRefresh.disabled=SOLID_SHAPE!=='random';
   updateViewTag();
 }
 function redrawSolidStill(){
@@ -2193,7 +2199,7 @@ function redrawSolidStill(){
 }
 function setSolidShape(shape,n,refresh){
   SOLID_SHAPE=shape; POLY_N=clampPolyN(n);
-  if(refresh && SOLID_SHAPE==='random' && POLY_N<=16) POLY_SEED++;
+  if(refresh && SOLID_SHAPE==='random') POLY_SEED++;
   for(const r of cubeRenderers) r.setShape(SOLID_SHAPE,POLY_N,POLY_SEED);
   refreshSolidControls(); redrawSolidStill();
 }

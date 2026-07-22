@@ -220,6 +220,67 @@ async function main() {
       !Number.isFinite(productSurfaces.gpuBridge.forces.nodeStrength)) {
       throw new Error(`WebGPU bridge is missing the 3D modal/camera contract: ${JSON.stringify(productSurfaces.gpuBridge)}`);
     }
+    const gpuProfilesAndShapes = await win.webContents.executeJavaScript(`(() => {
+      const profiles={};
+      for(const style of ['sand','msand','cosmic','dcosmic']){
+        window.soundMotionNative.setStyle(style);
+        const snapshot=window.soundMotionGpuBridge.snapshot();
+        profiles[style]={forces:snapshot.forces,restitution:snapshot.shape.restitution};
+      }
+      window.soundMotionNative.setSolidShape('regular',20,false);
+      const regular=window.soundMotionGpuBridge.snapshot();
+      window.soundMotionNative.setSolidShape('random',24,true);
+      const randomA=window.soundMotionGpuBridge.snapshot();
+      window.soundMotionNative.setSolidShape('random',24,true);
+      const randomB=window.soundMotionGpuBridge.snapshot();
+      window.soundMotionNative.setSolidShape('sphere',8,false);
+      const sphere=window.soundMotionGpuBridge.snapshot();
+      return {
+        profiles,
+        regular:{shape:regular.shape,revision:regular.shapeRevision},
+        randomA:{shape:randomA.shape,revision:randomA.shapeRevision},
+        randomB:{shape:randomB.shape,revision:randomB.shapeRevision},
+        sphere:{shape:sphere.shape,revision:sphere.shapeRevision},
+        controls:{facesDisabled:document.getElementById('polyfaces').disabled,label:document.getElementById('polyval').textContent}
+      };
+    })()`);
+    const expectedProfiles = {
+      sand: { forces: { pointerStrength: 1, nodeStrength: 1, driftStrength: 0.25 }, restitution: 0.58 },
+      msand: { forces: { pointerStrength: 0, nodeStrength: 0.72, driftStrength: 0.08 }, restitution: 0.52 },
+      cosmic: { forces: { pointerStrength: 0, nodeStrength: 0.68, driftStrength: 0.20 }, restitution: 0.86 },
+      dcosmic: { forces: { pointerStrength: 0.45, nodeStrength: 0.88, driftStrength: 1 }, restitution: 0.88 }
+    };
+    if (JSON.stringify(gpuProfilesAndShapes.profiles) !== JSON.stringify(expectedProfiles)) {
+      throw new Error(`Per-style GPU mechanics changed unexpectedly: ${JSON.stringify(gpuProfilesAndShapes.profiles)}`);
+    }
+    if (gpuProfilesAndShapes.regular.shape.type !== 'convex' || gpuProfilesAndShapes.regular.shape.planes.length !== 20) {
+      throw new Error(`Regular icosahedron did not reach the GPU bridge: ${JSON.stringify(gpuProfilesAndShapes.regular)}`);
+    }
+    if (gpuProfilesAndShapes.randomA.shape.type !== 'convex' || gpuProfilesAndShapes.randomA.shape.planes.length !== 24 ||
+      gpuProfilesAndShapes.randomB.shape.type !== 'convex' || gpuProfilesAndShapes.randomB.shape.planes.length !== 24 ||
+      gpuProfilesAndShapes.randomA.revision === gpuProfilesAndShapes.randomB.revision ||
+      JSON.stringify(gpuProfilesAndShapes.randomA.shape.planes) === JSON.stringify(gpuProfilesAndShapes.randomB.shape.planes)) {
+      throw new Error(`Random convex refresh did not update the GPU bridge: ${JSON.stringify(gpuProfilesAndShapes)}`);
+    }
+    if (gpuProfilesAndShapes.sphere.shape.type !== 'sphere' || Math.abs(gpuProfilesAndShapes.sphere.shape.radius - 0.96) > 1e-9 ||
+      !gpuProfilesAndShapes.controls.facesDisabled || gpuProfilesAndShapes.controls.label !== '球体') {
+      throw new Error(`Explicit sphere mode is inconsistent: ${JSON.stringify(gpuProfilesAndShapes.sphere)}`);
+    }
+    win.setContentSize(390, 844);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    const mobileShapeControl = await win.webContents.executeJavaScript(`(() => {
+      const segment=document.getElementById('solidshape'), segmentRect=segment.getBoundingClientRect();
+      const buttons=Array.from(segment.querySelectorAll('button')).map(button=>{
+        const rect=button.getBoundingClientRect(); return {left:rect.left,right:rect.right,width:rect.width,height:rect.height};
+      });
+      return {viewport:innerWidth,segment:{left:segmentRect.left,right:segmentRect.right,width:segmentRect.width},buttons};
+    })()`);
+    if (mobileShapeControl.segment.left < 0 || mobileShapeControl.segment.right > mobileShapeControl.viewport + 0.5 ||
+      mobileShapeControl.buttons.some((button) => button.width <= 0 || button.height < 44 || button.left < mobileShapeControl.segment.left - 0.5 || button.right > mobileShapeControl.segment.right + 0.5)) {
+      throw new Error(`GPU shape selector overflows its mobile surface: ${JSON.stringify(mobileShapeControl)}`);
+    }
+    win.setContentSize(1280, 800);
+    await new Promise((resolve) => setTimeout(resolve, 80));
     if (productSurfaces.rendererRuntime.actual === 'canvas+webgpu') {
       if (productSurfaces.rendererRuntime.status !== 'ready' || productSurfaces.rendererRuntime.simulation !== 'modal-3d' || !productSurfaces.rendererRuntime.modePair || !productSurfaces.rendererRuntime.shapeKind || productSurfaces.rendererRuntime.framesSubmitted < 1 || !productSurfaces.gpuVisible || !productSurfaces.rendererStatus.includes('WebGPU')) {
         throw new Error(`WebGPU was reported before a submitted frame or without the GPU surface: ${JSON.stringify(productSurfaces)}`);
@@ -244,7 +305,7 @@ async function main() {
     const redirect = await win.webContents.executeJavaScript('({path:location.pathname,search:location.search,hash:location.hash})');
     if (redirect.search !== '?source=legacy' || redirect.hash !== '#demo') throw new Error(`Legacy redirect lost URL state: ${JSON.stringify(redirect)}`);
     if (errors.length) throw new Error(`Browser console errors: ${errors.join(' | ')}`);
-    console.log('PASS Pages branding, generated demo signal, Plate Lab defaults, truthful WebGPU/Canvas runtime status, parity Canvas lock, shared Web default pattern, per-style details, bilingual UI, licenses, and /website/ redirect');
+    console.log('PASS Pages branding, generated demo signal, Plate Lab defaults, GPU regular/random/sphere boundaries, per-style GPU mechanics, truthful WebGPU/Canvas runtime status, parity Canvas lock, shared Web default pattern, per-style details, bilingual UI, licenses, and /website/ redirect');
   } finally {
     if (!win.isDestroyed()) win.destroy();
     await new Promise((resolve) => server.close(resolve));
