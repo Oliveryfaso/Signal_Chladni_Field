@@ -19,7 +19,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Signal Field — 自动音乐视觉短片创作器</title>
-<meta name="description" content="上传一首歌，在本机自动生成场景、标题、LRC 歌词和节拍剪辑，并通过桌面队列渲染 3D 粒子短片。">
+<meta name="description" content="上传一首歌，在本机自动生成场景、标题、LRC 歌词和节拍剪辑，再用可拖拽波形时间轴精修并通过桌面队列渲染 3D 粒子短片。">
 <meta property="og:title" content="Signal Field — Automatic Music Visual Creator">
 <meta property="og:description" content="Direct scenes, titles, timestamped lyrics and beat edits locally, then render a finished 3D particle film.">
 <meta property="og:type" content="website">
@@ -153,7 +153,7 @@
   <div class="hero-copy">
     <p class="eyebrow">SIGNAL FIELD</p>
     <h1 class="title" data-i18n="heroTitle">把一首歌变成 3D 粒子短片</h1>
-    <p class="subhead" data-i18n="tagline">上传音乐，自动编排场景、标题、歌词和节拍剪辑，再用桌面版一键渲染成片。</p>
+    <p class="subhead" data-i18n="tagline">上传音乐，自动编排场景，再在波形时间轴精修歌词与节拍，最后一键渲染成片。</p>
     <div class="hero-actions">
       <a class="hero-cta" href="app/index.html#music-director" data-i18n="primaryCta">开始制作</a>
       <span class="hero-note" data-i18n="advancedNote">音乐只在本机处理；完整高级工作台仍然保留。</span>
@@ -277,9 +277,9 @@ var lang='zh';
 try{ lang=localStorage.getItem('chladni-web-lang')||(/^zh\b/i.test(navigator.language)?'zh':'en'); }catch(e){}
 var copy={
   zh:{
-    description:'上传一首歌，在本机自动生成场景、标题、歌词和节拍剪辑，并渲染成 3D 粒子短片。',
+    description:'上传一首歌，在本机自动生成场景、标题和节拍，再用波形时间轴精修并渲染成 3D 粒子短片。',
     heroTitle:'把一首歌变成 3D 粒子短片',
-    tagline:'上传音乐，自动编排场景、标题、歌词和节拍剪辑，再用桌面版一键渲染成片。',
+    tagline:'上传音乐，自动编排场景，再在波形时间轴精修歌词与节拍，最后一键渲染成片。',
     primaryCta:'开始制作', advancedNote:'音乐只在本机处理；完整高级工作台仍然保留。',
     engineTitle:'Signal Field 实时演示', advancedSettings:'高级设置', closeSettings:'关闭高级设置',
     rotationMode:'旋转模式', single:'单轴', tumble:'翻滚', precess:'进动', rotationSpeed:'转速', zoom:'缩放', detail:'细节',

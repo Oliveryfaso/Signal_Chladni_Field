@@ -241,14 +241,19 @@ async function main() {
         finishingHidden:document.getElementById('directorFinishing').hidden,
         valid:window.SignalFieldSceneStudio.validateProject(project).valid,
         productionValid:window.SignalFieldProductionSpec.validate(state.productionSpec).valid,
-        beatEdits:state.productionSpec.beatEdits.length
+        beatEdits:state.productionSpec.beatEdits.length,
+        timelineEditor:state.timelineEditor,
+        timelineHidden:document.getElementById('directorTimelineEditor').hidden,
+        waveformError:state.waveformError
       };
     })()`);
     if (!musicDirection.valid || musicDirection.scenes < 1 || musicDirection.scenes !== musicDirection.keyframes || musicDirection.cueCount !== musicDirection.scenes ||
       musicDirection.durationMs !== 4000 || musicDirection.source !== 'file' || !musicDirection.fileLoaded || musicDirection.previewDisabled || musicDirection.exportDisabled ||
       musicDirection.renderDisabled || musicDirection.renderMode !== 'package' || musicDirection.renderText !== '下载创作方案' ||
       !musicDirection.renderHint.includes('浏览器不会生成 MP4') || !musicDirection.renderHint.includes('音频不会打包') || musicDirection.finishingHidden ||
-      !musicDirection.productionValid || musicDirection.beatEdits < 1) {
+      !musicDirection.productionValid || musicDirection.beatEdits < 1 || musicDirection.timelineHidden || !musicDirection.timelineEditor ||
+      musicDirection.timelineEditor.durationMs !== musicDirection.durationMs || musicDirection.timelineEditor.waveformBuckets < 1 ||
+      musicDirection.timelineEditor.waveformBuckets > 4096) {
       throw new Error(`Music director did not create a usable local project: ${JSON.stringify(musicDirection)}`);
     }
     const finishing = await win.webContents.executeJavaScript(`(() => {
@@ -266,6 +271,79 @@ async function main() {
     if (!finishing.valid || finishing.lyrics !== 2 || finishing.lyric !== '第一行歌词' || finishing.frameLyric !== '第一行歌词' || !finishing.titleVisible || finishing.queueChildren !== 0 ||
       !(finishing.counts.punchy > finishing.counts.balanced && finishing.counts.balanced > finishing.counts.relaxed)) {
       throw new Error(`Production finishing controls are invalid: ${JSON.stringify(finishing)}`);
+    }
+    const timelineEditing = await win.webContents.executeJavaScript(`(() => {
+      const before=window.sceneStudioController.state().productionSpec;
+      const originalLyricStart=before.lyrics[0].startMs;
+      const lyric=document.querySelector('#directorLyricsLane .director-lyric-handle.start');
+      lyric.focus();
+      lyric.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
+      const afterLyric=window.sceneStudioController.state().productionSpec;
+      const movedLyricStart=afterLyric.lyrics[0].startMs;
+      const lrc=document.getElementById('directorLyricsText').value;
+      const oldFrame=window.SignalFieldProductionOverlay.frameState(afterLyric,originalLyricStart+5,{reducedMotion:true});
+      const newFrame=window.SignalFieldProductionOverlay.frameState(afterLyric,movedLyricStart,{reducedMotion:true});
+
+      const snap=document.getElementById('directorTimelineSnap');snap.value='off';snap.dispatchEvent(new Event('change',{bubbles:true}));
+      const beat=document.querySelector('#directorBeatLane .director-beat-point');
+      const originalBeat=afterLyric.beatEdits[0].timeMs;
+      beat.focus();
+      beat.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
+      const movedBeat=window.sceneStudioController.state().productionSpec.beatEdits[0].timeMs;
+      const title=document.getElementById('directorTitleText');title.value='保留手调切点';title.dispatchEvent(new Event('input',{bubbles:true}));
+      const beatAfterTitle=window.sceneStudioController.state().productionSpec.beatEdits[0].timeMs;
+      const density=document.getElementById('directorBeatDensity');density.value='relaxed';density.dispatchEvent(new Event('change',{bubbles:true}));
+      const beatAfterDensity=window.sceneStudioController.state().productionSpec.beatEdits[0].timeMs;
+      const manualBeforeReset=Boolean(window.sceneStudioController.state().editableBeatEdits);
+
+      const zoom=document.getElementById('directorTimelineZoom');zoom.value='4';zoom.dispatchEvent(new Event('input',{bubbles:true}));
+      const editor=window.sceneStudioController.state().timelineEditor;
+      const dpr=window.devicePixelRatio||1;
+      const roundTrip=window.SignalFieldTimelineEditorCore.xToTime(
+        window.SignalFieldTimelineEditorCore.timeToX(1234,afterLyric.project.timeline.durationMs,1000),
+        afterLyric.project.timeline.durationMs,1000
+      );
+      document.getElementById('directorTimelineFit').click();
+      document.getElementById('directorBeatReset').click();
+      const afterReset=window.sceneStudioController.state();
+      return {
+        valid:window.SignalFieldProductionSpec.validate(afterLyric).valid,
+        originalLyricStart,movedLyricStart,lrc,oldLyric:oldFrame.lyric&&oldFrame.lyric.text,newLyric:newFrame.lyric&&newFrame.lyric.text,
+        originalBeat,movedBeat,beatAfterTitle,beatAfterDensity,manualBeforeReset,manualAfterReset:Boolean(afterReset.editableBeatEdits),
+        resetBeat:afterReset.productionSpec.beatEdits[0].timeMs,
+        editor,dpr,roundTrip
+      };
+    })()`);
+    if (!timelineEditing.valid || timelineEditing.movedLyricStart !== timelineEditing.originalLyricStart + 10 ||
+      !timelineEditing.lrc.includes('[00:00.510]') || timelineEditing.oldLyric || timelineEditing.newLyric !== '第一行歌词' ||
+      timelineEditing.movedBeat !== timelineEditing.originalBeat + 10 || timelineEditing.beatAfterTitle !== timelineEditing.movedBeat ||
+      timelineEditing.beatAfterDensity !== timelineEditing.movedBeat || !timelineEditing.manualBeforeReset || timelineEditing.manualAfterReset ||
+      timelineEditing.resetBeat === timelineEditing.movedBeat || timelineEditing.editor.contentWidth <= timelineEditing.editor.viewportWidth ||
+      timelineEditing.editor.canvasCssWidth > timelineEditing.editor.viewportWidth + 1 ||
+      timelineEditing.editor.canvasWidth > timelineEditing.editor.viewportWidth * timelineEditing.dpr + 2 ||
+      Math.abs(timelineEditing.roundTrip - 1234) > 1) {
+      throw new Error(`Waveform timeline editing is invalid: ${JSON.stringify(timelineEditing)}`);
+    }
+    const dragStart = await win.webContents.executeJavaScript(`(() => {
+      const marker=document.querySelector('#directorBeatLane .director-beat-point');
+      marker.scrollIntoView({block:'center'});
+      const rect=marker.getBoundingClientRect();
+      return {x:Math.round(rect.left+rect.width/2),y:Math.round(rect.top+rect.height/2),before:window.sceneStudioController.state().productionSpec.beatEdits[0].timeMs};
+    })()`);
+    win.webContents.sendInputEvent({ type: 'mouseDown', x: dragStart.x, y: dragStart.y, button: 'left', clickCount: 1 });
+    win.webContents.sendInputEvent({ type: 'mouseMove', x: dragStart.x + 12, y: dragStart.y, button: 'left' });
+    win.webContents.sendInputEvent({ type: 'mouseMove', x: dragStart.x + 24, y: dragStart.y, button: 'left' });
+    win.webContents.sendInputEvent({ type: 'mouseUp', x: dragStart.x + 24, y: dragStart.y, button: 'left', clickCount: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const pointerDrag = await win.webContents.executeJavaScript(`(() => {
+      const state=window.sceneStudioController.state();
+      const result={after:state.productionSpec.beatEdits[0].timeMs,manual:Boolean(state.editableBeatEdits),valid:window.SignalFieldProductionSpec.validate(state.productionSpec).valid,status:document.getElementById('directorTimelineStatus').textContent};
+      document.getElementById('directorBeatReset').click();
+      scrollTo(0,0);
+      return result;
+    })()`);
+    if (!pointerDrag.valid || !pointerDrag.manual || pointerDrag.after === dragStart.before || !pointerDrag.status.includes('已调整')) {
+      throw new Error(`Pointer drag did not commit a canonical beat edit: ${JSON.stringify({ dragStart, pointerDrag })}`);
     }
     await win.webContents.executeJavaScript('document.getElementById("directorPreview").click()');
     await waitFor(win, 'window.sceneStudioController.state().playbackRunning && window.soundMotionTest.state().audioSource==="file" && window.soundMotionTest.state().playing', 'music-synchronised timeline preview');
@@ -338,6 +416,7 @@ async function main() {
     win.setContentSize(390, 844);
     await new Promise((resolve) => setTimeout(resolve, 80));
     const mobileShapeControl = await win.webContents.executeJavaScript(`(() => {
+      const zoom=document.getElementById('directorTimelineZoom');zoom.value='4';zoom.dispatchEvent(new Event('input',{bubbles:true}));
       const segment=document.getElementById('solidshape'), segmentRect=segment.getBoundingClientRect();
       const director=document.getElementById('musicDirector').getBoundingClientRect();
       const buttons=Array.from(segment.querySelectorAll('button')).map(button=>{
@@ -345,13 +424,20 @@ async function main() {
       });
       const directorActions=Array.from(document.querySelectorAll('.director-action')).map(button=>button.getBoundingClientRect().height);
       const finishing=document.getElementById('directorFinishing').getBoundingClientRect();
-      const finishingControls=Array.from(document.querySelectorAll('#directorFinishing input,#directorFinishing select,#directorFinishing button,#directorRender')).filter(el=>!el.hidden).map(el=>{const rect=el.getBoundingClientRect();return {height:rect.height,left:rect.left,right:rect.right};});
-      return {viewport:innerWidth,documentWidth:document.documentElement.scrollWidth,director:{left:director.left,right:director.right},finishing:{left:finishing.left,right:finishing.right},finishingControls,directorActions,segment:{left:segmentRect.left,right:segmentRect.right,width:segmentRect.width},buttons};
+      const finishingControls=Array.from(document.querySelectorAll('#directorFinishing input,#directorFinishing select,#directorFinishing button,#directorRender')).filter(el=>!el.hidden&&!el.closest('#directorTimelineContent')).map(el=>{const rect=el.getBoundingClientRect();return {height:rect.height,left:rect.left,right:rect.right};});
+      const timelineViewport=document.getElementById('directorTimelineViewport');
+      const timelineCanvas=document.getElementById('directorWaveformCanvas');
+      const markerHeights=Array.from(document.querySelectorAll('#directorTimelineContent button')).map(button=>button.getBoundingClientRect().height);
+      const result={viewport:innerWidth,documentWidth:document.documentElement.scrollWidth,director:{left:director.left,right:director.right},finishing:{left:finishing.left,right:finishing.right},finishingControls,directorActions,segment:{left:segmentRect.left,right:segmentRect.right,width:segmentRect.width},buttons,timeline:{clientWidth:timelineViewport.clientWidth,scrollWidth:timelineViewport.scrollWidth,canvasCssWidth:timelineCanvas.getBoundingClientRect().width,markerHeights}};
+      document.getElementById('directorTimelineFit').click();
+      return result;
     })()`);
     if (mobileShapeControl.segment.left < 0 || mobileShapeControl.segment.right > mobileShapeControl.viewport + 0.5 ||
       mobileShapeControl.documentWidth > mobileShapeControl.viewport + 1 || mobileShapeControl.director.left < 0 || mobileShapeControl.director.right > mobileShapeControl.viewport + 0.5 ||
       mobileShapeControl.finishing.left < 0 || mobileShapeControl.finishing.right > mobileShapeControl.viewport + 0.5 ||
       mobileShapeControl.directorActions.some((height) => height < 44) || mobileShapeControl.finishingControls.some((control) => control.height < 44 || control.left < 0 || control.right > mobileShapeControl.viewport + 0.5) ||
+      mobileShapeControl.timeline.scrollWidth <= mobileShapeControl.timeline.clientWidth || mobileShapeControl.timeline.canvasCssWidth > mobileShapeControl.timeline.clientWidth + 1 ||
+      mobileShapeControl.timeline.markerHeights.some((height) => height < 44) ||
       mobileShapeControl.buttons.some((button) => button.width <= 0 || button.height < 44 || button.left < mobileShapeControl.segment.left - 0.5 || button.right > mobileShapeControl.segment.right + 0.5)) {
       throw new Error(`GPU shape selector overflows its mobile surface: ${JSON.stringify(mobileShapeControl)}`);
     }
@@ -381,7 +467,7 @@ async function main() {
     const redirect = await win.webContents.executeJavaScript('({path:location.pathname,search:location.search,hash:location.hash})');
     if (redirect.search !== '?source=legacy' || redirect.hash !== '#demo') throw new Error(`Legacy redirect lost URL state: ${JSON.stringify(redirect)}`);
     if (errors.length) throw new Error(`Browser console errors: ${errors.join(' | ')}`);
-    console.log('PASS creator entry, local music analysis, automatic Scene Studio direction, title/LRC/beat production spec, honest Web render-package fallback, music-synchronised overlay preview, mobile finishing layout, Plate Lab defaults, GPU regular/random/sphere boundaries, per-style GPU mechanics, truthful WebGPU/Canvas runtime status, parity Canvas lock, bilingual UI, licenses, and /website/ redirect');
+    console.log('PASS creator entry, local music analysis, automatic Scene Studio direction, bounded waveform timeline, pointer/keyboard lyric and beat editing, manual beat retention/reset, honest Web render-package fallback, music-synchronised overlay preview, mobile finishing layout, Plate Lab defaults, GPU regular/random/sphere boundaries, per-style GPU mechanics, truthful WebGPU/Canvas runtime status, parity Canvas lock, bilingual UI, licenses, and /website/ redirect');
   } finally {
     if (!win.isDestroyed()) win.destroy();
     await new Promise((resolve) => server.close(resolve));

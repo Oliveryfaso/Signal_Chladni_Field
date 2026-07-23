@@ -1,5 +1,12 @@
 # Technical evolution
 
+## 2026-07-23 — Bounded waveform timeline and canonical manual edits
+
+- Added a dependency-free timeline core for local PCM min/max peaks, time/coordinate mapping, lyric boundary constraints, and beat-grid snapping. Waveform data is bounded to 4096 UI buckets and never enters exported Production Specs.
+- Added one responsive waveform editor shared by Web and Electron Creator. It follows the existing audio clock, supports click/keyboard seeking, fit-to-window through 8× zoom, local horizontal scrolling, pointer dragging, and keyboard-equivalent lyric/beat editing.
+- Manual lyric moves rewrite normalized LRC starts and preserve explicit end ranges in the Production Spec. Manual beat positions survive title edits and density changes; replacement requires the explicit reset action.
+- The Canvas backing store tracks only the visible viewport rather than the zoomed content width. Mobile Pages verification keeps the document within 390 pixels while allowing intentional scroll inside the timeline viewport.
+
 ## 2026-07-23 — Production Spec, shared overlays, and desktop render queue
 
 - Added the strict `signal-field-production/v1` envelope around an unchanged Scene Studio project. It validates four title templates, ordered non-overlapping LRC cues, cut/accent/hold beat edits, output aspect, codec, and safe file name.

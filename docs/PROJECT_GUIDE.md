@@ -1,6 +1,6 @@
 # Signal Field project guide
 
-**Updated:** 2026-07-22
+**Updated:** 2026-07-23
 
 ## Product goal
 
@@ -17,7 +17,7 @@ Signal Field is a local-first creation tool that turns one music file into an ed
 
 1. **Automatic music visual:** choose a local song, one of three direction templates, `16:9`, `9:16`, or `1:1`, and a target duration. Analysis extracts energy, spectral balance, change intensity, tempo, and sections without uploading the file.
 2. **Directed preview:** the generated scenes and keyframes are imported through Scene Studio validation, then previewed against the selected audio clock so cuts and transitions stay aligned after seek or replay.
-3. **Finish:** choose an opening-title template, optionally import timestamped LRC lyrics, and select relaxed/balanced/punchy beat-cut density. These settings form a strict Production Spec around the unchanged Scene Studio project.
+3. **Finish:** choose an opening-title template, optionally import timestamped LRC lyrics, and select relaxed/balanced/punchy beat-cut density. A bounded local waveform timeline then supports seeking plus pointer/keyboard adjustment of lyric ranges and beat points. These settings form a strict Production Spec around the unchanged Scene Studio project.
 4. **Render:** the Web app downloads the Production Spec and honestly requires the desktop app for encoding. The desktop Creator uses a native save dialog and serial render queue with progress, cancellation, completion, and bounded error states.
 5. **Live field:** choose a particle mode, then use the generated demo signal, microphone, user-file, or system-audio input where the platform permits it.
 6. **Advanced labs:** data fields, focus sessions, anomaly replay, and Plate Lab remain available without replacing the creator-first path.
@@ -31,6 +31,8 @@ Signal Field is a local-first creation tool that turns one music file into an ed
 | `app/music-director.js` | Dependency-free music feature analysis, tempo/section estimates, and deterministic template-to-project planning. |
 | `app/production-spec.js` | Strict title, LRC lyric, beat-edit, aspect, output, and embedded-project envelope. |
 | `app/production-overlay.js` | Shared Canvas compositor for preview and encoded title/lyric/beat overlays. |
+| `app/timeline-editor-core.js` | Bounded waveform peaks, time/coordinate mapping, lyric boundary constraints, beat-grid snapping, and immutable edit operations. |
+| `app/waveform-timeline.js` | Responsive Canvas waveform plus semantic lyric/beat controls, zoom, seeking, playhead, pointer drag, and keyboard editing. |
 | `app/scene-studio.js` | Dependency-free, validated scene/project/timeline state and renderer recipe mapping. |
 | `app/scene-studio-ui.js` | Creator flow, audio-clock preview, responsive Scene Studio UI, local persistence, and JSON import/export. |
 | `app/plate-lab-core.js` | Validated SI-unit Kirchhoff–Love rectangular-plate modes, responses, grids, and allowlisted 3D recipes. |
@@ -57,6 +59,7 @@ npm run verify:scene-studio
 npm run verify:music-director
 npm run verify:production-spec
 npm run verify:production-overlay
+npm run verify:timeline-editor
 npm run verify:render-queue
 npm run verify:video-export-options
 npm run verify:video-export-smoke
@@ -75,8 +78,8 @@ Inherited icons, media, and the prior Pixabay track were removed from Signal Fie
 
 ## Current scope and next product work
 
-The creator workflow now performs local music analysis, offers three direction templates and three aspects, creates a validated Scene Studio timeline, adds four controlled title treatments, imports timestamped LRC lyrics, and produces three densities of deterministic beat edits. Browser preview and final export share the same compositor. The desktop app opens the full Creator in its own window and can add H.264/ProRes work to a serial local queue through a native save dialog.
+The creator workflow now performs local music analysis, offers three direction templates and three aspects, creates a validated Scene Studio timeline, adds four controlled title treatments, imports timestamped LRC lyrics, and produces three densities of deterministic beat edits. A 4096-bucket local waveform editor shares the audio playhead, supports fit/zoom and local horizontal scrolling, and commits constrained lyric/beat moves into the same Production Spec used by preview and export. The desktop app opens the full Creator in its own window and can add H.264/ProRes work to a serial local queue through a native save dialog.
 
-Current limits are explicit: lyrics require timestamps; there is no speech transcription, lyric search, word-level karaoke, per-beat drag editor, parallel/persistent queue, embedded font pack, or additive WebGPU layer in encoded video. Source/development desktop rendering also requires FFmpeg/ffprobe on the machine. Installed-package render-worker validation remains release work.
+Current limits are explicit: lyrics require timestamps; there is no speech transcription, lyric search, word-level karaoke, multi-track audio editing, general undo/redo, parallel/persistent queue, embedded font pack, or additive WebGPU layer in encoded video. Source/development desktop rendering also requires FFmpeg/ffprobe on the machine. Installed-package render-worker validation remains release work.
 
 The retained baseline still includes Web, Electron, system audio, microphone/file input, four visual styles, fullscreen, macOS screen saver/lock paths, data events, Plate Lab, and the full advanced workspace. Compatible Web browsers can add the 64K/128K WebGPU enhancement, while transparent/native overlays, parity tests, deterministic video exports, unsupported hardware, and device-loss states remain Canvas-only.

@@ -1,5 +1,13 @@
 # Decision log
 
+## 2026-07-23 — Keep waveform UI state out of the production schema
+
+**Decision:** Treat PCM-derived min/max peaks, zoom, scroll, selection, and editor-only IDs as transient local UI state. Commit only constrained lyric ranges and beat edit times into the existing `signal-field-production/v1` fields.
+
+**Why:** Final preview, JSON transfer, desktop queueing, and deterministic export already consume canonical lyrics and beat edits. A second editor schema would create drift, increase private-media risk, and make projects depend on disposable waveform caches.
+
+**Boundary:** The first editor provides one waveform, one lyric lane, and one beat lane with per-item pointer/keyboard editing. Multi-track audio, clip cutting, word-level karaoke, bulk selection, and general undo/redo remain later NLE work.
+
 ## 2026-07-23 — Separate production instructions from scene state
 
 **Decision:** Keep Scene Studio focused on reusable renderer snapshots and wrap it in a versioned Production Spec for titles, timestamped lyrics, beat edits, aspect, codec, and file name. Use one overlay compositor in browser preview and deterministic video export.

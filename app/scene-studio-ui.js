@@ -14,6 +14,8 @@
   const Director = window.SignalFieldMusicDirector;
   const Production = window.SignalFieldProductionSpec;
   const ProductionOverlay = window.SignalFieldProductionOverlay;
+  const TimelineCore = window.SignalFieldTimelineEditorCore;
+  const WaveformTimeline = window.SignalFieldWaveformTimeline;
   const Desktop = window.soundMotionDesktop;
   const target = window.soundMotionNative;
   const testApi = window.soundMotionTest;
@@ -55,6 +57,9 @@
   const directorBeatDensity = document.getElementById('directorBeatDensity');
   const directorBeatSummary = document.getElementById('directorBeatSummary');
   const directorBeatCues = document.getElementById('directorBeatCues');
+  const directorBeatReset = document.getElementById('directorBeatReset');
+  const directorTimelineEditor = document.getElementById('directorTimelineEditor');
+  const directorTimelinePlay = document.getElementById('directorTimelinePlay');
   const directorRender = document.getElementById('directorRender');
   const directorRenderHint = document.getElementById('directorRenderHint');
   const directorQueue = document.getElementById('directorQueue');
@@ -80,6 +85,11 @@
   let directionAnalysis = null;
   let productionSpec = null;
   let parsedLyrics = [];
+  let editableBeatEdits = null;
+  let waveformData = null;
+  let waveformError = null;
+  let beatGridMs = [];
+  let timelineEditor = null;
   const renderTasks = new Map();
   let directionGeneration = 0;
   let selectedTemplate = 'ambient-orbit';
@@ -117,6 +127,18 @@
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${totalTenths % 10}`;
   }
 
+  function formatLrcTime(milliseconds) {
+    const value = Math.max(0, Math.round(milliseconds));
+    const minutes = Math.floor(value / 60000);
+    const seconds = Math.floor((value % 60000) / 1000);
+    const fraction = value % 1000;
+    return `[${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(fraction).padStart(3, '0')}]`;
+  }
+
+  function serializeLyricsForLrc(lyrics) {
+    return lyrics.map((cue) => `${formatLrcTime(cue.startMs)} ${cue.text}`).join('\n');
+  }
+
   function safeOutputBase(value) {
     return String(value || 'signal-field-video').replace(/\.[^.]+$/, '').replace(/[^\w\u4e00-\u9fff-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 120) || 'signal-field-video';
   }
@@ -143,7 +165,7 @@
     });
   }
 
-  function beatEditsForCurrentProject() {
+  function automaticBeatEditsForCurrentProject() {
     if (!directionPlan || !directionAnalysis) return [];
     const project = store.getProject();
     const durationMs = project.timeline.durationMs;
@@ -176,14 +198,18 @@
     return edits;
   }
 
+  function beatEditsForCurrentProject() {
+    return editableBeatEdits ? editableBeatEdits.map((edit) => ({ ...edit })) : automaticBeatEditsForCurrentProject();
+  }
+
   function renderBeatSummary(edits) {
     if (!directorBeatSummary || !directorBeatCues) return;
     const tempo = directionAnalysis && directionAnalysis.tempo;
     const cuts = edits.filter((edit) => edit.action === 'cut').length;
     const accents = edits.filter((edit) => edit.action === 'accent').length;
-    directorBeatSummary.textContent = tempo && tempo.confidence >= 0.25
+    directorBeatSummary.textContent = (tempo && tempo.confidence >= 0.25
       ? `${Math.round(tempo.bpm)} BPM · ${cuts} 个硬切 · ${accents} 个强调`
-      : `自由节奏 · ${cuts} 个段落切点`;
+      : `自由节奏 · ${cuts} 个段落切点`) + (editableBeatEdits ? ' · 已手动调整' : '');
     directorBeatCues.innerHTML = '';
     edits.slice(0, 12).forEach((edit) => {
       const chip = document.createElement('span');
@@ -225,6 +251,10 @@
       const spec = buildProductionSpec();
       directorRender.disabled = false;
       drawProductionOverlay(Number(timeline.value) || 0);
+      if (timelineEditor) {
+        timelineEditor.setLyrics(spec.lyrics);
+        timelineEditor.setBeatEdits(spec.beatEdits);
+      }
       return spec;
     } catch (error) {
       directorRender.disabled = true;
@@ -506,6 +536,7 @@
     const snapshot = productionSnapshot(result.timeMs, result.snapshot);
     if (snapshot) applySnapshot(snapshot, force);
     drawProductionOverlay(result.timeMs);
+    if (timelineEditor) timelineEditor.setCurrentTime(result.timeMs);
     return result;
   }
 
@@ -525,6 +556,7 @@
     playbackRunning = true;
     playButton.textContent = '■ 停止时间线';
     if (directorPreview) directorPreview.textContent = '■ 停止预览';
+    if (directorTimelinePlay) directorTimelinePlay.textContent = '■ 停止';
     lastAppliedSnapshot = null;
     lastApplyAt = -Infinity;
     timeline.value = String(current);
@@ -540,6 +572,7 @@
     const elapsed = Math.min(duration, audioPlayback ? audioPlayback.currentTime * 1000 : now - playbackStartedAt);
     timeline.value = String(Math.round(elapsed));
     updateTimeLabel();
+    if (timelineEditor) timelineEditor.setCurrentTime(elapsed);
     if (now - lastApplyAt >= APPLY_INTERVAL_MS || elapsed >= duration) {
       seekAndApply(elapsed, false);
       lastApplyAt = now;
@@ -559,6 +592,7 @@
     playbackRunning = false;
     playButton.textContent = '▶ 播放时间线';
     if (directorPreview) directorPreview.textContent = '▶ 随音乐预览';
+    if (directorTimelinePlay) directorTimelinePlay.textContent = '▶ 播放';
     if (playbackStartedDemo || playbackUsingFile) {
       target.stop();
       if (previousSource && previousSource !== (playbackUsingFile ? 'file' : 'demo')) target.selectSource(previousSource);
@@ -628,6 +662,9 @@
         const scale = 1 / buffer.numberOfChannels;
         for (let index = 0; index < sampleCount; index += 1) samples[index] += source[index] * scale;
       }
+      for (let index = 0; index < sampleCount; index += 1) {
+        samples[index] = Math.max(-1, Math.min(1, samples[index]));
+      }
       return { samples, sampleRate: buffer.sampleRate, durationMs };
     } finally {
       if (typeof context.close === 'function') context.close().catch(() => {});
@@ -652,6 +689,10 @@
     const previousPlan = directionPlan;
     const previousAnalysis = directionAnalysis;
     const previousProduction = productionSpec;
+    const previousWaveform = waveformData;
+    const previousWaveformError = waveformError;
+    const previousBeatGrid = beatGridMs;
+    const previousEditableBeats = editableBeatEdits;
     directorGenerate.disabled = true;
     directorPreview.disabled = true;
     directorExport.disabled = true;
@@ -660,6 +701,18 @@
       const durationChoice = directorDuration.value === 'full' ? musicMeta.durationMs : Number(directorDuration.value) * 1000;
       const pcm = await decodeMusicFile(musicFile, Math.min(musicMeta.durationMs, durationChoice), generation);
       if (generation !== directionGeneration) return;
+      let nextWaveform = null;
+      waveformError = null;
+      if (TimelineCore) {
+        try {
+          nextWaveform = TimelineCore.buildWaveform(
+            { samples: pcm.samples, sampleRate: pcm.sampleRate },
+            { bucketCount: Math.min(4096, pcm.samples.length), durationMs: pcm.durationMs }
+          );
+        } catch (error) {
+          waveformError = String(error && error.message || error);
+        }
+      }
       setDirectorStatus('正在识别段落并生成视觉场景…');
       await new Promise((resolve) => setTimeout(resolve, 0));
       const analysis = Director.analyzeMono({ samples: pcm.samples, sampleRate: pcm.sampleRate }, { durationMs: pcm.durationMs, frameRate: 10 });
@@ -679,6 +732,11 @@
       directionPlan = Object.assign({}, plan, { project: store.getProject() });
       directionAnalysis = analysis;
       productionSpec = null;
+      waveformData = nextWaveform;
+      editableBeatEdits = null;
+      beatGridMs = TimelineCore && analysis.tempo.confidence >= 0.25 && analysis.tempo.beatMs > 0
+        ? TimelineCore.buildBeatGrid({ durationMs: directionPlan.project.timeline.durationMs, beatMs: analysis.tempo.beatMs })
+        : [];
       selectedId = directionPlan.project.scenes[0] ? directionPlan.project.scenes[0].id : null;
       timeline.value = '0';
       persist();
@@ -689,6 +747,8 @@
       directorFinishing.hidden = false;
       directorFinishing.open = true;
       updateProductionSpec();
+      directorBeatReset.disabled = true;
+      refreshTimelineEditor();
       const tempo = analysis.tempo.confidence >= 0.25 ? `${Math.round(analysis.tempo.bpm)} BPM` : '自由节奏';
       setDirectorStatus(`已生成 ${directionPlan.project.scenes.length} 个段落 · ${tempo} · ${selectedAspect} · 可直接预览或继续编辑`);
     } catch (error) {
@@ -696,6 +756,10 @@
       directionPlan = previousPlan;
       directionAnalysis = previousAnalysis;
       productionSpec = previousProduction;
+      waveformData = previousWaveform;
+      waveformError = previousWaveformError;
+      beatGridMs = previousBeatGrid;
+      editableBeatEdits = previousEditableBeats;
       setDirectorStatus(`生成失败：${error.message || '无法分析这个文件'}。原有项目已保留。`, true);
     } finally {
       if (generation === directionGeneration) {
@@ -722,7 +786,12 @@
     directionAnalysis = null;
     productionSpec = null;
     parsedLyrics = [];
+    editableBeatEdits = null;
+    waveformData = null;
+    waveformError = null;
+    beatGridMs = [];
     if (directorFinishing) directorFinishing.hidden = true;
+    if (directorTimelineEditor) directorTimelineEditor.hidden = true;
     if (directorLyricsText) directorLyricsText.value = '';
     if (directorTitleText) directorTitleText.value = '';
     if (productionCanvas && ProductionOverlay) ProductionOverlay.clearOverlay(productionCanvas);
@@ -783,6 +852,79 @@
   function setLyricsError(error) {
     directorLyricsStatus.textContent = `歌词未更新：${error.message || error}`;
     directorLyricsStatus.setAttribute('role', 'alert');
+  }
+
+  function mountTimelineEditor() {
+    if (timelineEditor || !directorTimelineEditor || !TimelineCore || !WaveformTimeline) return timelineEditor;
+    timelineEditor = WaveformTimeline.mount(directorTimelineEditor, {
+      onEditStart() {
+        stopPlayback(true);
+      },
+      onSeek(timeMs) {
+        stopPlayback(true);
+        seekAndApply(timeMs, false);
+      },
+      onTogglePlayback() {
+        startPlayback();
+      },
+      onDraft(kind, values, timeMs) {
+        if (productionSpec) {
+          try {
+            productionSpec = Production.create({
+              ...productionSpec,
+              lyrics: kind === 'lyric' ? values : productionSpec.lyrics,
+              beatEdits: kind === 'beat' ? values : productionSpec.beatEdits
+            });
+          } catch (_error) {}
+        }
+        seekAndApply(timeMs, false);
+      },
+      onCancel(_lyrics, _beats, timeMs) {
+        updateProductionSpec();
+        seekAndApply(timeMs, false);
+      },
+      onLyricsChange(next) {
+        const previous = parsedLyrics;
+        parsedLyrics = next;
+        try {
+          updateProductionSpec();
+          directorLyricsText.value = serializeLyricsForLrc(parsedLyrics);
+          directorLyricsStatus.textContent = `已手动调整 ${parsedLyrics.length} 条歌词时间；结束边界保存在创作方案中。`;
+          directorLyricsStatus.setAttribute('role', 'status');
+        } catch (error) {
+          parsedLyrics = previous;
+          updateProductionSpec();
+          throw error;
+        }
+      },
+      onBeatEditsChange(next) {
+        const previous = editableBeatEdits;
+        editableBeatEdits = next;
+        try {
+          updateProductionSpec();
+          directorBeatReset.disabled = false;
+        } catch (error) {
+          editableBeatEdits = previous;
+          updateProductionSpec();
+          throw error;
+        }
+      }
+    });
+    return timelineEditor;
+  }
+
+  function refreshTimelineEditor() {
+    if (!productionSpec || !directionAnalysis) return;
+    const editor = mountTimelineEditor();
+    if (!editor) return;
+    editor.setData({
+      durationMs: productionSpec.project.timeline.durationMs,
+      waveform: waveformData,
+      lyrics: productionSpec.lyrics,
+      beatEdits: productionSpec.beatEdits,
+      beatGridMs
+    });
+    editor.setCurrentTime(Number(timeline.value) || 0);
   }
 
   function renderQueueTask(task) {
@@ -889,7 +1031,21 @@
     directorTitleTemplate.addEventListener('change', updateProductionSpec);
     directorTitleText.addEventListener('input', updateProductionSpec);
     directorSubtitleText.addEventListener('input', updateProductionSpec);
-    directorBeatDensity.addEventListener('change', updateProductionSpec);
+    directorBeatDensity.addEventListener('change', () => {
+      updateProductionSpec();
+      if (editableBeatEdits) {
+        directorBeatReset.disabled = false;
+        setDirectorStatus('切换密度不会覆盖手调切点；点击“按当前密度重新生成”才会替换。');
+      }
+    });
+    directorBeatReset.addEventListener('click', () => {
+      editableBeatEdits = null;
+      updateProductionSpec();
+      directorBeatReset.disabled = true;
+      if (timelineEditor && productionSpec) timelineEditor.setBeatEdits(productionSpec.beatEdits);
+      setDirectorStatus('已按当前密度重新生成节拍切点；原手动位置已被替换。');
+    });
+    directorTimelinePlay.addEventListener('click', () => { startPlayback(); });
     directorLyricsText.addEventListener('change', () => {
       try { ingestLyrics(directorLyricsText.value); } catch (error) { setLyricsError(error); }
     });
@@ -943,6 +1099,15 @@
       if (result.ok) { selectedId = result.project.scenes[0] ? result.project.scenes[0].id : null; persist(); render(); }
       return result;
     },
-    state: () => ({ project: store.getProject(), selectedId, playbackRunning, productionSpec, renderTasks: Array.from(renderTasks.values()) })
+    state: () => ({
+      project: store.getProject(),
+      selectedId,
+      playbackRunning,
+      productionSpec,
+      renderTasks: Array.from(renderTasks.values()),
+      timelineEditor: timelineEditor ? timelineEditor.state() : null,
+      editableBeatEdits: editableBeatEdits ? editableBeatEdits.map((edit) => ({ ...edit })) : null,
+      waveformError
+    })
   };
 }());

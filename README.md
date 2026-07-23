@@ -51,7 +51,8 @@ Each mode remembers its adjusted detail value for the current session. Particle 
 2. Choose **Ambient Orbit**, **Pulse Cut**, or **Sand Study**, then select `16:9`, `9:16`, or `1:1` and a full/short duration.
 3. Select **Analyze and generate**. Signal Field estimates energy, spectral balance, changes, tempo, and song sections, then creates a validated Scene Studio timeline.
 4. Open **Finish the video** to choose Minimal, Cinematic, Kinetic, or no opening title; optionally paste/import timestamped LRC lyrics; and choose relaxed, balanced, or punchy beat cuts.
-5. Preview the same title/lyric/beat compositor used by final export. On the Web, download the validated Production Spec. In the desktop Creator, choose **Render video** to select an output location and add the job to the local queue.
+5. Use the bounded waveform timeline to seek, zoom, and move lyric edges or beat points with pointer or keyboard. Manual beats stay in place until the explicit regenerate action.
+6. Preview the same title/lyric/beat compositor used by final export. On the Web, download the validated Production Spec. In the desktop Creator, choose **Render video** to select an output location and add the job to the local queue.
 
 The desktop Creator provides the one-click path. The equivalent CLI accepts either a Production Spec or the earlier scene project:
 
@@ -69,7 +70,7 @@ The repository-root `index.html` is the publishing entry point. It embeds the re
 **[Open the live Web Demo](https://oliveryfaso.github.io/Signal_Chladni_Field/)**
 
 - The creator-first surface handles local upload, three direction templates, three output aspects, automatic scene planning, audio-synchronised preview, and editable project export.
-- Finishing controls add controlled opening-title templates, timestamped LRC subtitles, and three densities of beat cuts. Preview and encoded video share the same Canvas compositor.
+- Finishing controls add controlled opening-title templates, timestamped LRC subtitles, three densities of beat cuts, and a responsive waveform editor for constrained lyric/beat timing. Preview and encoded video share the same Canvas compositor.
 - Switch the full visualizer interface between English and Chinese from the bottom dock.
 - Randomize patterns, enter fullscreen, pause rotation, and drag to inspect the form.
 - Advanced controls cover single-axis rotation, tumble, precession, speed, zoom, detail, particles, lighting, and solid shape.
@@ -159,6 +160,8 @@ app/index.html              Particle physics, audio analysis, and Canvas renderi
 app/music-director.js       Local music feature analysis and deterministic automatic direction plans
 app/production-spec.js      Validated project/title/LRC/beat/output production envelope
 app/production-overlay.js   Shared title, lyric, accent, and hold Canvas compositor
+app/timeline-editor-core.js Bounded waveform, coordinate, lyric, and beat edit core
+app/waveform-timeline.js    Responsive Canvas waveform and accessible timing controls
 app/plate-lab-core.js       Thin-plate modes, response, sampled grids, and safe mapping core
 app/plate-lab-ui.js         Touch/keyboard Plate Lab and nodal-map interface
 app/scene-studio.js         Scene, project, keyframe, and safe-recipe core
