@@ -1,5 +1,13 @@
 # Decision log
 
+## 2026-07-23 — Focus on local-first 3D lyric videos and draft plain-text timing
+
+**Decision:** Position Signal Field for independent musicians who want one local song and optional lyrics turned into an editable 3D particle video. Accept plain-text lyrics as one line per cue and create a deterministic timing draft from the existing local music structure, tempo, activity window, and line length.
+
+**Why:** Popular live visualizers win through preset breadth, while mature creator tools win through a short path to a shareable result. Signal Field cannot and should not become both a MilkDrop preset ecosystem and a general NLE. Removing the requirement to prepare LRC elsewhere shortens its own differentiated local workflow without adding cloud processing or a runtime dependency.
+
+**Boundary:** The draft is not speech recognition, transcription, forced alignment, or word-level karaoke. It is capped at a modest reference confidence, must be reviewable in the existing waveform editor, and commits only canonical lyric ranges. Packaged desktop rendering, project recovery, and truthful export messaging remain higher release-readiness work than adding more visual modes.
+
 ## 2026-07-23 — Keep waveform UI state out of the production schema
 
 **Decision:** Treat PCM-derived min/max peaks, zoom, scroll, selection, and editor-only IDs as transient local UI state. Commit only constrained lyric ranges and beat edit times into the existing `signal-field-production/v1` fields.

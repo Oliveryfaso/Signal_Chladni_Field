@@ -19,16 +19,16 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Signal Field — 自动音乐视觉短片创作器</title>
-<meta name="description" content="上传一首歌，在本机自动生成场景、标题、LRC 歌词和节拍剪辑，再用可拖拽波形时间轴精修并通过桌面队列渲染 3D 粒子短片。">
+<meta name="description" content="上传歌曲和歌词，在本机自动生成场景、歌词时间初稿和节拍剪辑，再用波形时间轴精修并通过桌面队列渲染 3D 粒子歌词短片。">
 <meta property="og:title" content="Signal Field — Automatic Music Visual Creator">
-<meta property="og:description" content="Direct scenes, titles, timestamped lyrics and beat edits locally, then render a finished 3D particle film.">
+<meta property="og:description" content="Turn a song and lyrics into a locally directed, editable 3D particle lyric video.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Signal Field">
 <meta property="og:url" content="https://oliveryfaso.github.io/Signal_Chladni_Field/">
 <meta property="og:image" content="https://oliveryfaso.github.io/Signal_Chladni_Field/desktop/assets/signal-field-icon.png">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Signal Field — Automatic Music Visual Creator">
-<meta name="twitter:description" content="Direct scenes, titles, timestamped lyrics and beat edits locally, then render a finished 3D particle film.">
+<meta name="twitter:description" content="Turn a song and lyrics into a locally directed, editable 3D particle lyric video.">
 <meta name="twitter:image" content="https://oliveryfaso.github.io/Signal_Chladni_Field/desktop/assets/signal-field-icon.png">
 <style>
   :root{
@@ -153,7 +153,7 @@
   <div class="hero-copy">
     <p class="eyebrow">SIGNAL FIELD</p>
     <h1 class="title" data-i18n="heroTitle">把一首歌变成 3D 粒子短片</h1>
-    <p class="subhead" data-i18n="tagline">上传音乐，自动编排场景，再在波形时间轴精修歌词与节拍，最后一键渲染成片。</p>
+    <p class="subhead" data-i18n="tagline">上传歌曲和歌词，在本机自动编排 3D 场景与歌词时间，再用波形时间轴精修成片。</p>
     <div class="hero-actions">
       <a class="hero-cta" href="app/index.html#music-director" data-i18n="primaryCta">开始制作</a>
       <span class="hero-note" data-i18n="advancedNote">音乐只在本机处理；完整高级工作台仍然保留。</span>
@@ -277,9 +277,9 @@ var lang='zh';
 try{ lang=localStorage.getItem('chladni-web-lang')||(/^zh\b/i.test(navigator.language)?'zh':'en'); }catch(e){}
 var copy={
   zh:{
-    description:'上传一首歌，在本机自动生成场景、标题和节拍，再用波形时间轴精修并渲染成 3D 粒子短片。',
+    description:'上传歌曲和歌词，在本机自动生成场景、歌词时间初稿和节拍，再用波形时间轴精修并渲染成 3D 粒子歌词短片。',
     heroTitle:'把一首歌变成 3D 粒子短片',
-    tagline:'上传音乐，自动编排场景，再在波形时间轴精修歌词与节拍，最后一键渲染成片。',
+    tagline:'上传歌曲和歌词，在本机自动编排 3D 场景与歌词时间，再用波形时间轴精修成片。',
     primaryCta:'开始制作', advancedNote:'音乐只在本机处理；完整高级工作台仍然保留。',
     engineTitle:'Signal Field 实时演示', advancedSettings:'高级设置', closeSettings:'关闭高级设置',
     rotationMode:'旋转模式', single:'单轴', tumble:'翻滚', precess:'进动', rotationSpeed:'转速', zoom:'缩放', detail:'细节',
@@ -291,9 +291,9 @@ var copy={
     switchLanguage:'Switch to English', sourceCode:'查看 GitHub 源码'
   },
   en:{
-    description:'Turn a song into a local 3D particle film with directed scenes, titles, timestamped lyrics, beat edits, and desktop rendering.',
+    description:'Turn a song and lyrics into a locally directed, editable 3D particle lyric video.',
     heroTitle:'Turn a song into a 3D particle film',
-    tagline:'Upload music, direct scenes, titles, lyrics, and beat edits, then render the finished film in the desktop app.',
+    tagline:'Upload a song and lyrics, draft local timing and 3D scenes, then refine them on the waveform.',
     primaryCta:'Start creating', advancedNote:'Your music stays on this device. The full advanced workspace remains available.',
     engineTitle:'Live Signal Field demo', advancedSettings:'Advanced settings', closeSettings:'Close advanced settings',
     rotationMode:'Rotation', single:'Single axis', tumble:'Tumble', precess:'Precess', rotationSpeed:'Speed', zoom:'Zoom', detail:'Detail',

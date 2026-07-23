@@ -5,7 +5,7 @@
   Apache-2.0-licensed source; retain LICENSE, UPSTREAM_NOTICE.md, and MODIFICATIONS.md
   in source and redistributions.
 -->
-<html lang="en">
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -158,12 +158,13 @@
         </fieldset>
         <fieldset class="director-polish-block" id="directorLyricsPanel">
           <legend><h3>歌词字幕</h3></legend>
-          <label class="director-field">时间戳歌词（LRC）
-            <textarea id="directorLyricsText" placeholder="[00:12.40] 第一行歌词&#10;[00:16.80] 第二行歌词" aria-describedby="directorLyricsStatus"></textarea>
+          <label class="director-field">歌词（LRC 或每行一句纯文本）
+            <textarea id="directorLyricsText" placeholder="第一行歌词&#10;第二行歌词&#10;&#10;也可直接粘贴：[00:12.40] 已有时间戳的歌词" aria-describedby="directorLyricsStatus"></textarea>
           </label>
           <label class="director-field">或导入 .lrc 文件<input id="directorLyricsFile" type="file" accept=".lrc,text/plain"></label>
+          <button class="director-action" id="directorLyricsDraft" type="button" disabled>为纯文本生成时间初稿</button>
           <button class="director-action" id="directorLyricsClear" type="button">清空歌词</button>
-          <p class="director-help" id="directorLyricsStatus" role="status" aria-live="polite">不做联网搜索或无时间戳自动对齐；你的歌词仅保存在本机方案中。</p>
+          <p class="director-help" id="directorLyricsStatus" role="status" aria-live="polite">纯文本初排使用本机音乐结构和行长，不是人声识别；结果可在波形时间轴校正。</p>
         </fieldset>
         <fieldset class="director-polish-block" id="directorBeatPanel">
           <legend><h3>节拍剪辑</h3></legend>
@@ -354,6 +355,7 @@
 <script src="./plate-lab-ui.js"></script>
 <script src="./scene-studio.js"></script>
 <script src="./music-director.js"></script>
+<script src="./lyric-timing.js"></script>
 <script src="./production-spec.js"></script>
 <script src="./production-overlay.js"></script>
 <script src="./timeline-editor-core.js"></script>

@@ -4,7 +4,7 @@
 
 ## Product goal
 
-Signal Field is a local-first creation tool that turns one music file into an editable 3D particle video timeline. The primary result is a directed music visual rather than an open-ended particle playground: users choose a template and output format, receive an automatically structured sequence, preview it against the original audio, and then refine or export it. Live visualization, data fields, focus sessions, Plate Lab, and expert rendering controls remain available as advanced workflows.
+Signal Field is a local-first generative 3D lyric-video tool for independent musicians. It turns one music file and optional lyrics into an editable particle-video timeline. The primary result is a directed, exportable music visual rather than an open-ended particle playground or general-purpose video editor. Live visualization, data fields, focus sessions, Plate Lab, and expert rendering controls remain available as advanced workflows.
 
 ## Intended users
 
@@ -17,7 +17,7 @@ Signal Field is a local-first creation tool that turns one music file into an ed
 
 1. **Automatic music visual:** choose a local song, one of three direction templates, `16:9`, `9:16`, or `1:1`, and a target duration. Analysis extracts energy, spectral balance, change intensity, tempo, and sections without uploading the file.
 2. **Directed preview:** the generated scenes and keyframes are imported through Scene Studio validation, then previewed against the selected audio clock so cuts and transitions stay aligned after seek or replay.
-3. **Finish:** choose an opening-title template, optionally import timestamped LRC lyrics, and select relaxed/balanced/punchy beat-cut density. A bounded local waveform timeline then supports seeking plus pointer/keyboard adjustment of lyric ranges and beat points. These settings form a strict Production Spec around the unchanged Scene Studio project.
+3. **Finish:** choose an opening-title template, paste plain-text lyrics for a local structure/line-length timing draft or import timestamped LRC, and select relaxed/balanced/punchy beat-cut density. A bounded local waveform timeline then supports seeking plus pointer/keyboard adjustment of lyric ranges and beat points. These settings form a strict Production Spec around the unchanged Scene Studio project.
 4. **Render:** the Web app downloads the Production Spec and honestly requires the desktop app for encoding. The desktop Creator uses a native save dialog and serial render queue with progress, cancellation, completion, and bounded error states.
 5. **Live field:** choose a particle mode, then use the generated demo signal, microphone, user-file, or system-audio input where the platform permits it.
 6. **Advanced labs:** data fields, focus sessions, anomaly replay, and Plate Lab remain available without replacing the creator-first path.
@@ -29,6 +29,7 @@ Signal Field is a local-first creation tool that turns one music file into an ed
 | `index.html` | Public/local Web shell, controls, responsive presentation, and the embedded visual engine. |
 | `app/index.html` | Shared particle renderer, audio analysis, data-field controls, and runtime state. |
 | `app/music-director.js` | Dependency-free music feature analysis, tempo/section estimates, and deterministic template-to-project planning. |
+| `app/lyric-timing.js` | Deterministic local line-level timing drafts from plain-text lyrics and existing music analysis; explicitly not speech recognition. |
 | `app/production-spec.js` | Strict title, LRC lyric, beat-edit, aspect, output, and embedded-project envelope. |
 | `app/production-overlay.js` | Shared Canvas compositor for preview and encoded title/lyric/beat overlays. |
 | `app/timeline-editor-core.js` | Bounded waveform peaks, time/coordinate mapping, lyric boundary constraints, beat-grid snapping, and immutable edit operations. |
@@ -57,6 +58,7 @@ npm run build:pages
 npm run verify:pages
 npm run verify:scene-studio
 npm run verify:music-director
+npm run verify:lyric-timing
 npm run verify:production-spec
 npm run verify:production-overlay
 npm run verify:timeline-editor
@@ -78,8 +80,10 @@ Inherited icons, media, and the prior Pixabay track were removed from Signal Fie
 
 ## Current scope and next product work
 
-The creator workflow now performs local music analysis, offers three direction templates and three aspects, creates a validated Scene Studio timeline, adds four controlled title treatments, imports timestamped LRC lyrics, and produces three densities of deterministic beat edits. A 4096-bucket local waveform editor shares the audio playhead, supports fit/zoom and local horizontal scrolling, and commits constrained lyric/beat moves into the same Production Spec used by preview and export. The desktop app opens the full Creator in its own window and can add H.264/ProRes work to a serial local queue through a native save dialog.
+The creator workflow now performs local music analysis, offers three direction templates and three aspects, creates a validated Scene Studio timeline, adds four controlled title treatments, converts plain-text lyrics into a review-required local timing draft or imports timestamped LRC, and produces three densities of deterministic beat edits. A 4096-bucket local waveform editor shares the audio playhead, supports fit/zoom and local horizontal scrolling, and commits constrained lyric/beat moves into the same Production Spec used by preview and export. The desktop app opens the full Creator in its own window and can add H.264/ProRes work to a serial local queue through a native save dialog.
 
-Current limits are explicit: lyrics require timestamps; there is no speech transcription, lyric search, word-level karaoke, multi-track audio editing, general undo/redo, parallel/persistent queue, embedded font pack, or additive WebGPU layer in encoded video. Source/development desktop rendering also requires FFmpeg/ffprobe on the machine. Installed-package render-worker validation remains release work.
+Current limits are explicit: plain-text timing is a structure/tempo/line-length draft and does not listen for sung words. There is no speech transcription, forced alignment, lyric search, word-level karaoke, multi-track audio editing, general undo/redo, parallel/persistent queue, embedded font pack, or additive WebGPU layer in encoded video. Source/development desktop rendering also requires FFmpeg/ffprobe on the machine. Installed-package render-worker validation remains release work.
+
+The 2026-07-23 competitive audit chose one narrow direction instead of copying preset ecosystems, stock-footage services, or general cloud editors. See [COMPETITIVE_AUDIT.zh-CN.md](COMPETITIVE_AUDIT.zh-CN.md).
 
 The retained baseline still includes Web, Electron, system audio, microphone/file input, four visual styles, fullscreen, macOS screen saver/lock paths, data events, Plate Lab, and the full advanced workspace. Compatible Web browsers can add the 64K/128K WebGPU enhancement, while transparent/native overlays, parity tests, deterministic video exports, unsupported hardware, and device-loss states remain Canvas-only.

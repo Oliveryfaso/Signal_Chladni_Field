@@ -230,6 +230,7 @@ async function main() {
       const state=window.sceneStudioController.state(), project=state.project;
       return {
         title:project.title,scenes:project.scenes.length,keyframes:project.timeline.keyframes.length,durationMs:project.timeline.durationMs,
+        documentLang:document.documentElement.lang,
         source:window.soundMotionTest.state().audioSource,fileLoaded:window.soundMotionTest.state().audioFileLoaded,
         cueCount:document.querySelectorAll('#directorCues .director-cue').length,
         previewDisabled:document.getElementById('directorPreview').disabled,
@@ -248,13 +249,32 @@ async function main() {
       };
     })()`);
     if (!musicDirection.valid || musicDirection.scenes < 1 || musicDirection.scenes !== musicDirection.keyframes || musicDirection.cueCount !== musicDirection.scenes ||
-      musicDirection.durationMs !== 4000 || musicDirection.source !== 'file' || !musicDirection.fileLoaded || musicDirection.previewDisabled || musicDirection.exportDisabled ||
+      musicDirection.durationMs !== 4000 || musicDirection.documentLang !== 'zh-CN' || musicDirection.source !== 'file' || !musicDirection.fileLoaded || musicDirection.previewDisabled || musicDirection.exportDisabled ||
       musicDirection.renderDisabled || musicDirection.renderMode !== 'package' || musicDirection.renderText !== '下载创作方案' ||
       !musicDirection.renderHint.includes('浏览器不会生成 MP4') || !musicDirection.renderHint.includes('音频不会打包') || musicDirection.finishingHidden ||
       !musicDirection.productionValid || musicDirection.beatEdits < 1 || musicDirection.timelineHidden || !musicDirection.timelineEditor ||
       musicDirection.timelineEditor.durationMs !== musicDirection.durationMs || musicDirection.timelineEditor.waveformBuckets < 1 ||
       musicDirection.timelineEditor.waveformBuckets > 4096) {
       throw new Error(`Music director did not create a usable local project: ${JSON.stringify(musicDirection)}`);
+    }
+    const lyricDraft = await win.webContents.executeJavaScript(`(() => {
+      const lyrics=document.getElementById('directorLyricsText');
+      const button=document.getElementById('directorLyricsDraft');
+      lyrics.value='第一行纯文本\\n长度更长的第二行纯文本歌词\\n最后一句';
+      button.click();
+      const spec=window.sceneStudioController.state().productionSpec;
+      return {
+        buttonDisabled:button.disabled,
+        valid:window.SignalFieldProductionSpec.validate(spec).valid,
+        lyrics:spec.lyrics,
+        lrc:lyrics.value,
+        status:document.getElementById('directorLyricsStatus').textContent
+      };
+    })()`);
+    if (lyricDraft.buttonDisabled || !lyricDraft.valid || lyricDraft.lyrics.length !== 3 ||
+      !lyricDraft.lrc.includes('[00:') || !lyricDraft.status.includes('不是人声识别') ||
+      lyricDraft.lyrics.some((cue,index) => cue.endMs <= cue.startMs || (index && cue.startMs < lyricDraft.lyrics[index - 1].endMs))) {
+      throw new Error(`Local plain-text lyric timing draft is invalid: ${JSON.stringify(lyricDraft)}`);
     }
     const finishing = await win.webContents.executeJavaScript(`(() => {
       const lyrics=document.getElementById('directorLyricsText');

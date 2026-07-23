@@ -1,5 +1,12 @@
 # Technical evolution
 
+## 2026-07-23 — Deterministic local plain-text lyric timing
+
+- Added a dependency-free lyric timing module that converts one-line-per-cue plain text into ordered, non-overlapping Production Spec lyric ranges using the existing local music analysis.
+- Allocation uses a bounded activity window, leading/trailing quiet sections, line-length weights, and optional confident beat snapping. It does not upload media or claim to detect sung words.
+- Added explicit review diagnostics and a conservative 60% maximum reference confidence; the generated LRC immediately reuses the existing waveform timeline, shared preview overlay, JSON transfer, and desktop export.
+- Added strict unit coverage plus Pages integration coverage for the pure-text-to-canonical-lyrics flow, corrected the Chinese Creator document language, and preserved the 390-pixel mobile path.
+
 ## 2026-07-23 — Bounded waveform timeline and canonical manual edits
 
 - Added a dependency-free timeline core for local PCM min/max peaks, time/coordinate mapping, lyric boundary constraints, and beat-grid snapping. Waveform data is bounded to 4096 UI buckets and never enters exported Production Specs.

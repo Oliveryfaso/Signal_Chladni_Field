@@ -3,6 +3,7 @@
 - Keep `app/index.html` as the shared Web/Electron visual source; do not create a second renderer in the public shell.
 - Keep Music Video Director as the primary Web flow: local audio analysis must produce a validated Scene Studio project, and preview time must follow the selected audio clock rather than wall-clock time.
 - Keep titles, timestamped lyrics, beat edits, aspect, and output settings inside canonical `signal-field-production/v1`; do not add those fields to the strict Scene Studio project schema or store them only in DOM state.
+- Keep the product focused on local-first 3D lyric videos for independent musicians. Plain-text lyric timing may use local structure, tempo, and line length only as an explicitly reviewable draft; never describe it as speech recognition, transcription, forced alignment, or word-level karaoke.
 - Browser preview and deterministic video export must use the shared `app/production-overlay.js` compositor so title/lyric timing and safe areas stay aligned.
 - Keep waveform peaks transient and bounded; raw PCM, peaks, editor IDs, zoom, scroll, and absolute audio paths must never enter the Production Spec. Manual lyric and beat moves must update canonical `lyrics` / `beatEdits` and must not be overwritten by unrelated title or density UI changes.
 - The waveform editor and `#sceneTimeline` share one current audio time. Do not introduce a second playback clock; only the timeline viewport may scroll horizontally on mobile.

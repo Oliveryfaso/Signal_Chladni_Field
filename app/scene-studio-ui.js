@@ -12,6 +12,7 @@
 
   const Studio = window.SignalFieldSceneStudio;
   const Director = window.SignalFieldMusicDirector;
+  const LyricTiming = window.SignalFieldLyricTiming;
   const Production = window.SignalFieldProductionSpec;
   const ProductionOverlay = window.SignalFieldProductionOverlay;
   const TimelineCore = window.SignalFieldTimelineEditorCore;
@@ -52,6 +53,7 @@
   const directorSubtitleText = document.getElementById('directorSubtitleText');
   const directorLyricsText = document.getElementById('directorLyricsText');
   const directorLyricsFile = document.getElementById('directorLyricsFile');
+  const directorLyricsDraft = document.getElementById('directorLyricsDraft');
   const directorLyricsClear = document.getElementById('directorLyricsClear');
   const directorLyricsStatus = document.getElementById('directorLyricsStatus');
   const directorBeatDensity = document.getElementById('directorBeatDensity');
@@ -748,6 +750,7 @@
       directorFinishing.open = true;
       updateProductionSpec();
       directorBeatReset.disabled = true;
+      if (directorLyricsDraft) directorLyricsDraft.disabled = false;
       refreshTimelineEditor();
       const tempo = analysis.tempo.confidence >= 0.25 ? `${Math.round(analysis.tempo.bpm)} BPM` : '自由节奏';
       setDirectorStatus(`已生成 ${directionPlan.project.scenes.length} 个段落 · ${tempo} · ${selectedAspect} · 可直接预览或继续编辑`);
@@ -793,6 +796,7 @@
     if (directorFinishing) directorFinishing.hidden = true;
     if (directorTimelineEditor) directorTimelineEditor.hidden = true;
     if (directorLyricsText) directorLyricsText.value = '';
+    if (directorLyricsDraft) directorLyricsDraft.disabled = true;
     if (directorTitleText) directorTitleText.value = '';
     if (productionCanvas && ProductionOverlay) ProductionOverlay.clearOverlay(productionCanvas);
     directorCues.innerHTML = '';
@@ -852,6 +856,24 @@
   function setLyricsError(error) {
     directorLyricsStatus.textContent = `歌词未更新：${error.message || error}`;
     directorLyricsStatus.setAttribute('role', 'alert');
+  }
+
+  function createPlainTextLyricDraft() {
+    if (!LyricTiming || !directionAnalysis) throw new Error('请先分析音乐并生成场景');
+    const result = LyricTiming.createDraft(directorLyricsText.value, directionAnalysis);
+    const previous = parsedLyrics;
+    parsedLyrics = result.lyrics;
+    try {
+      updateProductionSpec();
+      directorLyricsText.value = serializeLyricsForLrc(parsedLyrics);
+      const percent = Math.round(result.diagnostics.confidence * 100);
+      directorLyricsStatus.textContent = `已在本机生成 ${parsedLyrics.length} 行时间初稿 · 参考置信度 ${percent}% · 这不是人声识别，请在波形时间轴检查并拖动校正。`;
+      directorLyricsStatus.setAttribute('role', 'status');
+    } catch (error) {
+      parsedLyrics = previous;
+      updateProductionSpec();
+      throw error;
+    }
   }
 
   function mountTimelineEditor() {
@@ -1058,6 +1080,9 @@
         ingestLyrics(text); directorLyricsText.value = text;
       } catch (error) { setLyricsError(error); }
       finally { directorLyricsFile.value = ''; }
+    });
+    directorLyricsDraft.addEventListener('click', () => {
+      try { createPlainTextLyricDraft(); } catch (error) { setLyricsError(error); }
     });
     directorLyricsClear.addEventListener('click', () => {
       parsedLyrics = []; directorLyricsText.value = ''; updateProductionSpec();
