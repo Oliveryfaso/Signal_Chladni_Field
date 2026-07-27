@@ -1,5 +1,21 @@
 # Decision log
 
+## 2026-07-27 — Recover canonical production state without persisting local media
+
+**Decision:** Autosave a versioned, size-bounded Production session containing the strict Production Spec, Creator choices, canonical editor values, and an allowlisted audio identity fingerprint. Never persist audio bytes, paths, Blob, PCM, or waveform peaks. A restored project must ask the user to reselect a matching file before synchronized preview or desktop render.
+
+**Why:** Titles, lyrics, and beat work should survive reloads and crashes, but silent file retention would violate the local-first trust boundary and is not reliably available in browsers. Metadata matching reconnects user intent without claiming the app can reopen arbitrary local media.
+
+**Boundary:** Queue history remains in memory, audio must be reselected, and corrupt/unknown session schemas are rejected rather than migrated implicitly.
+
+## 2026-07-27 — Dispatch packaged rendering before desktop UI startup
+
+**Decision:** Use one Electron bootstrap that detects an explicit render-worker flag before requiring the ordinary main process. Development launches the bootstrap script; packaged jobs relaunch the `.app` executable with the same flag. Preflight external FFmpeg/ffprobe, keep rendering serial, allow retry only for failed tasks, and reveal only server-resolved completed outputs.
+
+**Why:** `app.asar` is not a writable process working directory, and a packaged executable does not behave like the Electron development CLI. Early flag dispatch makes the worker path deterministic while keeping arbitrary commands and renderer-supplied reveal paths out of IPC.
+
+**Boundary:** FFmpeg and ffprobe are still external release prerequisites. Every artifact needs packaged-worker and real-encode verification; signing and notarization require publisher credentials.
+
 ## 2026-07-23 — Focus on local-first 3D lyric videos and draft plain-text timing
 
 **Decision:** Position Signal Field for independent musicians who want one local song and optional lyrics turned into an editable 3D particle video. Accept plain-text lyrics as one line per cue and create a deterministic timing draft from the existing local music structure, tempo, activity window, and line length.

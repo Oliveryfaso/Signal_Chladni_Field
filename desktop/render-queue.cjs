@@ -16,6 +16,7 @@ const MAX_PATH_LENGTH = 4096;
 const MAX_AUDIO_BYTES = 8 * 1024 * 1024 * 1024;
 const MAX_PROJECT_BYTES = 5 * 1024 * 1024;
 const MAX_PRODUCTION_BYTES = 6 * 1024 * 1024;
+const RENDER_WORKER_FLAG = '--signal-field-render-worker';
 
 function isPlainObject(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -132,6 +133,25 @@ function taskArguments(task) {
   return args;
 }
 
+function extractRenderWorkerArguments(argv) {
+  if (!Array.isArray(argv)) throw new Error('worker arguments must be an array');
+  const markerIndex = argv.indexOf(RENDER_WORKER_FLAG);
+  return markerIndex < 0 ? null : argv.slice(markerIndex + 1);
+}
+
+function renderWorkerLaunch(options, task) {
+  if (!isPlainObject(options)) throw new Error('worker launch options must be an object');
+  if (typeof options.electronPath !== 'string' || !options.electronPath) {
+    throw new Error('worker electron path is required');
+  }
+  if (!options.isPackaged && (typeof options.bootstrapScript !== 'string' || !options.bootstrapScript)) {
+    throw new Error('worker bootstrap script is required in development');
+  }
+  const args = options.isPackaged ? [] : [options.bootstrapScript];
+  args.push(RENDER_WORKER_FLAG, ...taskArguments(task));
+  return { command: options.electronPath, args };
+}
+
 function publicTask(task) {
   return {
     id: task.id,
@@ -161,7 +181,9 @@ function createRenderQueue(options = {}) {
   const emitter = new EventEmitter();
   const root = options.root || path.join(__dirname, '..');
   const exportScript = options.exportScript || path.join(root, 'scripts', 'export-video.cjs');
+  const bootstrapScript = options.bootstrapScript || path.join(root, 'desktop', 'bootstrap.cjs');
   const electronPath = options.electronPath || process.execPath;
+  const isPackaged = options.isPackaged === true;
   const spawnProcess = options.spawn || spawn;
   const now = options.now || (() => new Date().toISOString());
   const makeId = options.makeId || (() => crypto.randomUUID());
@@ -223,6 +245,7 @@ function createRenderQueue(options = {}) {
     if (!task) return;
     try {
       if (!fs.statSync(exportScript).isFile()) throw new Error('not a file');
+      if (!isPackaged && !fs.statSync(bootstrapScript).isFile()) throw new Error('not a file');
     } catch (_error) {
       finish(task, 'failed', 'video exporter is unavailable');
       return;
@@ -249,8 +272,12 @@ function createRenderQueue(options = {}) {
 
     let child;
     try {
-      child = spawnProcess(electronPath, [exportScript, ...taskArguments(task)], {
-        cwd: root,
+      const launch = renderWorkerLaunch({ electronPath, bootstrapScript, isPackaged }, task);
+      child = spawnProcess(launch.command, launch.args, {
+        // app.asar is not a real working directory in packaged applications.
+        // All validated task paths are absolute, so use the writable output
+        // directory as the worker's stable cwd in both modes.
+        cwd: path.dirname(task.output),
         env: process.env,
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe']
@@ -337,6 +364,21 @@ function createRenderQueue(options = {}) {
     return publicTask(task);
   }
 
+  function retry(id) {
+    if (typeof id !== 'string' || !id || id.length > 128) throw new Error('render task id is invalid');
+    const task = tasks.find((candidate) => candidate.id === id);
+    if (!task) throw new Error('render task was not found');
+    if (task.status !== 'failed') throw new Error('only a failed render task can be retried');
+    return enqueue({
+      project: task.project,
+      production: task.production,
+      audio: task.audio,
+      output: task.output,
+      aspect: task.aspect,
+      codec: task.codec
+    }, { allowExistingOutput: true });
+  }
+
   function shutdown() {
     shuttingDown = true;
     for (const task of tasks) {
@@ -359,6 +401,7 @@ function createRenderQueue(options = {}) {
     enqueue,
     list,
     cancel,
+    retry,
     shutdown,
     onChange(handler) {
       emitter.on('change', handler);
@@ -368,7 +411,10 @@ function createRenderQueue(options = {}) {
 }
 
 module.exports = {
+  RENDER_WORKER_FLAG,
   createRenderQueue,
+  extractRenderWorkerArguments,
+  renderWorkerLaunch,
   taskArguments,
   validateTaskInput
 };

@@ -6,6 +6,7 @@
 - Keep the product focused on local-first 3D lyric videos for independent musicians. Plain-text lyric timing may use local structure, tempo, and line length only as an explicitly reviewable draft; never describe it as speech recognition, transcription, forced alignment, or word-level karaoke.
 - Browser preview and deterministic video export must use the shared `app/production-overlay.js` compositor so title/lyric timing and safe areas stay aligned.
 - Keep waveform peaks transient and bounded; raw PCM, peaks, editor IDs, zoom, scroll, and absolute audio paths must never enter the Production Spec. Manual lyric and beat moves must update canonical `lyrics` / `beatEdits` and must not be overwritten by unrelated title or density UI changes.
+- Creator recovery must use the bounded `signal-field-production-session/v1` envelope. Persist only canonical production/editor fields and allowlisted audio identity metadata; never persist audio bytes, Blob, PCM, waveform peaks, or absolute paths. Restored synchronized preview/render requires explicit matching-file reselection.
 - The waveform editor and `#sceneTimeline` share one current audio time. Do not introduce a second playback clock; only the timeline viewport may scroll horizontally on mobile.
 - Desktop render requests must pass through the allowlisted render queue and native save dialog. Never expose arbitrary commands, shell strings, or an unvalidated output path to renderer code.
 - Describe export boundaries honestly: the Web app exports an editable project, while encoded H.264/ProRes video is produced by the desktop CLI. Do not imply that the deterministic Canvas exporter includes the additive WebGPU layer.
@@ -16,4 +17,5 @@
 - For UI changes, verify 390px mobile layout, keyboard focus, reduced motion, empty/error states, and horizontal overflow.
 - Before a public push, run `npm run check`, `npm run verify:pages`, `npm run verify:web-audio`, `npm run smoke`, and `npm run verify:mac-parity`.
 - When FFmpeg is available, also run `npm run verify:video-export-smoke` after changing production specs, overlays, queueing, or export code.
+- Before distributing a desktop artifact, run `npm run verify:packaged-render-worker -- "/path/to/Signal Field.app" --encode` from an APFS/internal build. Signing and notarization status must remain explicit.
 - `verify:mac-parity` compares deterministic Electron Canvas surfaces; it does not establish parity with the separate native Swift/Metal screen saver.

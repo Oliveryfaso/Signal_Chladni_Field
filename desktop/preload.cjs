@@ -17,6 +17,9 @@ contextBridge.exposeInMainWorld('soundMotionDesktop', {
   enqueueRender: (task) => ipcRenderer.invoke('sound-motion:render-queue-enqueue', task),
   listRenders: () => ipcRenderer.invoke('sound-motion:render-queue-list'),
   cancelRender: (id) => ipcRenderer.invoke('sound-motion:render-queue-cancel', id),
+  retryRender: (id) => ipcRenderer.invoke('sound-motion:render-queue-retry', id),
+  revealRender: (id) => ipcRenderer.invoke('sound-motion:render-queue-reveal', id),
+  renderPreflight: () => ipcRenderer.invoke('sound-motion:render-preflight'),
   onRenderQueueChange: (handler) => {
     if (typeof handler !== 'function') throw new TypeError('render queue handler must be a function');
     const listener = (_event, task) => handler(task);

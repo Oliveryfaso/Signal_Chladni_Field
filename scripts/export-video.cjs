@@ -759,14 +759,14 @@ async function render(options) {
   }
 }
 
-function runCli() {
+function runCli(argv = process.argv.slice(2)) {
   const { app } = require('electron');
   app.commandLine.appendSwitch('force-device-scale-factor', '1');
   app.commandLine.appendSwitch('disable-frame-rate-limit');
   app.on('window-all-closed', () => {});
 
   app.whenReady().then(async () => {
-    const options = loadOptions(process.argv.slice(2));
+    const options = loadOptions(argv);
     if (options.help) {
       console.log(HELP);
       return;
@@ -794,6 +794,7 @@ module.exports = {
   productionFrameEffects,
   productionSnapshotAt,
   render,
+  runCli,
   timelineSnapshotAt
 };
 

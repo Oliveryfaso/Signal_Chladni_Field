@@ -208,6 +208,29 @@ async function main() {
         ['ready','fallback','disabled','lost'].includes(window.signalFieldGpuController.state().status)`,
       'renderer runtime status'
     );
+    const aspectPreview = await win.webContents.executeJavaScript(`(async () => {
+      const stage=document.getElementById('stage'),status=document.getElementById('stageAspectStatus');
+      const result={};
+      for(const aspect of ['16:9','9:16','1:1']){
+        document.querySelector('#directorAspects [data-aspect="'+aspect+'"]').click();
+        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+        const rect=stage.getBoundingClientRect();
+        const layers=Array.from(stage.querySelectorAll('canvas')).map(canvas=>{
+          const layer=canvas.getBoundingClientRect(); return {width:layer.width,height:layer.height};
+        });
+        result[aspect]={width:rect.width,height:rect.height,contentWidth:stage.clientWidth,contentHeight:stage.clientHeight,dataset:stage.dataset.aspect,label:stage.getAttribute('aria-label'),status:status.textContent,layers};
+      }
+      document.querySelector('#directorAspects [data-aspect="16:9"]').click();
+      return result;
+    })()`);
+    const expectedPreviewRatios={'16:9':16/9,'9:16':9/16,'1:1':1};
+    for(const [aspect,expectedRatio] of Object.entries(expectedPreviewRatios)){
+      const preview=aspectPreview[aspect],ratio=preview.width/preview.height;
+      if(preview.dataset!==aspect || !preview.label.includes(aspect) || !preview.status.includes(aspect) || Math.abs(ratio-expectedRatio)>0.01 ||
+        preview.layers.some(layer=>Math.abs(layer.width-preview.contentWidth)>1 || Math.abs(layer.height-preview.contentHeight)>1)){
+        throw new Error(`Creator aspect preview is invalid for ${aspect}: ${JSON.stringify(preview)}`);
+      }
+    }
     await win.webContents.executeJavaScript(`(() => {
       const sampleRate=8000, seconds=4, count=sampleRate*seconds, bytes=new ArrayBuffer(44+count*2), view=new DataView(bytes);
       const text=(offset,value)=>{ for(let i=0;i<value.length;i++)view.setUint8(offset+i,value.charCodeAt(i)); };
@@ -291,6 +314,27 @@ async function main() {
     if (!finishing.valid || finishing.lyrics !== 2 || finishing.lyric !== '第一行歌词' || finishing.frameLyric !== '第一行歌词' || !finishing.titleVisible || finishing.queueChildren !== 0 ||
       !(finishing.counts.punchy > finishing.counts.balanced && finishing.counts.balanced > finishing.counts.relaxed)) {
       throw new Error(`Production finishing controls are invalid: ${JSON.stringify(finishing)}`);
+    }
+    const creatorHistory = await win.webContents.executeJavaScript(`(() => {
+      const title=document.getElementById('directorTitleText');
+      const before=window.sceneStudioController.state().productionSpec.titleCard.mainTitle;
+      title.value='撤销重做验证';
+      title.dispatchEvent(new Event('input',{bubbles:true}));
+      title.dispatchEvent(new Event('change',{bubbles:true}));
+      const changed=window.sceneStudioController.state().productionSpec.titleCard.mainTitle;
+      const undo=document.getElementById('directorUndo'),redo=document.getElementById('directorRedo');
+      undo.click();
+      const undone=window.sceneStudioController.state().productionSpec.titleCard.mainTitle;
+      redo.click();
+      const redone=window.sceneStudioController.state().productionSpec.titleCard.mainTitle;
+      const raw=localStorage.getItem(window.SignalFieldProductionSession.STORAGE_KEY);
+      const session=window.SignalFieldProductionSession.parse(raw);
+      return {before,changed,undone,redone,undoDisabled:undo.disabled,redoDisabled:redo.disabled,sessionTitle:session.productionSpec.titleCard.mainTitle,hasAudio:Boolean(session.audio),raw};
+    })()`);
+    if (creatorHistory.changed !== '撤销重做验证' || creatorHistory.undone !== creatorHistory.before || creatorHistory.redone !== creatorHistory.changed ||
+      creatorHistory.undoDisabled || !creatorHistory.redoDisabled || creatorHistory.sessionTitle !== creatorHistory.redone || !creatorHistory.hasAudio ||
+      /"path"|"file"|"samples"|"pcm"|"peaks"|"blob"/i.test(creatorHistory.raw)) {
+      throw new Error(`Creator undo/redo or bounded autosave is invalid: ${JSON.stringify(creatorHistory)}`);
     }
     const timelineEditing = await win.webContents.executeJavaScript(`(() => {
       const before=window.sceneStudioController.state().productionSpec;
@@ -435,6 +479,23 @@ async function main() {
     }
     win.setContentSize(390, 844);
     await new Promise((resolve) => setTimeout(resolve, 80));
+    const mobileAspectPreview = await win.webContents.executeJavaScript(`(async () => {
+      const stage=document.getElementById('stage'),result={};
+      for(const aspect of ['16:9','9:16','1:1']){
+        document.querySelector('#directorAspects [data-aspect="'+aspect+'"]').click();
+        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+        const rect=stage.getBoundingClientRect();
+        result[aspect]={left:rect.left,right:rect.right,width:rect.width,height:rect.height,viewport:innerWidth,documentWidth:document.documentElement.scrollWidth};
+      }
+      document.querySelector('#directorAspects [data-aspect="16:9"]').click();
+      return result;
+    })()`);
+    for(const [aspect,expectedRatio] of Object.entries(expectedPreviewRatios)){
+      const preview=mobileAspectPreview[aspect];
+      if(preview.left < 0 || preview.right > preview.viewport + 0.5 || preview.documentWidth > preview.viewport + 1 || Math.abs(preview.width/preview.height-expectedRatio)>0.01){
+        throw new Error(`Creator aspect preview overflows mobile for ${aspect}: ${JSON.stringify(preview)}`);
+      }
+    }
     const mobileShapeControl = await win.webContents.executeJavaScript(`(() => {
       const zoom=document.getElementById('directorTimelineZoom');zoom.value='4';zoom.dispatchEvent(new Event('input',{bubbles:true}));
       const segment=document.getElementById('solidshape'), segmentRect=segment.getBoundingClientRect();
@@ -469,6 +530,25 @@ async function main() {
       }
     } else if (productSurfaces.rendererRuntime.actual !== 'canvas' || !productSurfaces.rendererStatus.includes('Canvas') || productSurfaces.gpuVisible) {
       throw new Error(`Canvas fallback status is inconsistent: ${JSON.stringify(productSurfaces)}`);
+    }
+
+    const expectedRecovery = await win.webContents.executeJavaScript(`(() => {
+      const spec=window.sceneStudioController.state().productionSpec;
+      return {title:spec.titleCard.mainTitle,aspect:spec.aspect,lyrics:spec.lyrics.length,beats:spec.beatEdits.length,scenes:spec.project.scenes.length};
+    })()`);
+    await win.loadURL(`${base}/app/index.html`);
+    await waitFor(win, 'Boolean(window.sceneStudioController?.state().productionSpec) && document.getElementById("directorStatus").textContent.includes("已恢复上次工程")', 'creator crash recovery');
+    const recoveredCreator = await win.webContents.executeJavaScript(`(() => {
+      const state=window.sceneStudioController.state(),spec=state.productionSpec;
+      return {title:spec.titleCard.mainTitle,aspect:spec.aspect,lyrics:spec.lyrics.length,beats:spec.beatEdits.length,scenes:spec.project.scenes.length,
+        renderDisabled:document.getElementById('directorRender').disabled,renderMode:document.getElementById('directorRender').dataset.mode,previewDisabled:document.getElementById('directorPreview').disabled,
+        exportDisabled:document.getElementById('directorExport').disabled,filePrompt:document.getElementById('directorFileName').textContent,
+        timelineHidden:document.getElementById('directorTimelineEditor').hidden,stageAspect:document.getElementById('stage').dataset.aspect};
+    })()`);
+    if (JSON.stringify({title:recoveredCreator.title,aspect:recoveredCreator.aspect,lyrics:recoveredCreator.lyrics,beats:recoveredCreator.beats,scenes:recoveredCreator.scenes}) !== JSON.stringify(expectedRecovery) ||
+      recoveredCreator.renderDisabled || recoveredCreator.renderMode !== 'package' || !recoveredCreator.previewDisabled || recoveredCreator.exportDisabled || !recoveredCreator.filePrompt.includes('请重新选择') ||
+      recoveredCreator.timelineHidden || recoveredCreator.stageAspect !== expectedRecovery.aspect) {
+      throw new Error(`Creator crash recovery did not restore a safe editable session: ${JSON.stringify({expectedRecovery,recoveredCreator})}`);
     }
 
     await win.loadURL(`${base}/app/index.html?parity=1`);

@@ -14,6 +14,7 @@
   const Director = window.SignalFieldMusicDirector;
   const LyricTiming = window.SignalFieldLyricTiming;
   const Production = window.SignalFieldProductionSpec;
+  const ProductionSession = window.SignalFieldProductionSession;
   const ProductionOverlay = window.SignalFieldProductionOverlay;
   const TimelineCore = window.SignalFieldTimelineEditorCore;
   const WaveformTimeline = window.SignalFieldWaveformTimeline;
@@ -63,10 +64,14 @@
   const directorTimelineEditor = document.getElementById('directorTimelineEditor');
   const directorTimelinePlay = document.getElementById('directorTimelinePlay');
   const directorRender = document.getElementById('directorRender');
+  const directorUndo = document.getElementById('directorUndo');
+  const directorRedo = document.getElementById('directorRedo');
   const directorRenderHint = document.getElementById('directorRenderHint');
   const directorQueue = document.getElementById('directorQueue');
   const directorQueueStatus = document.getElementById('directorQueueStatus');
   const productionCanvas = document.getElementById('video-overlay-canvas');
+  const previewStage = document.getElementById('stage');
+  const previewAspectStatus = document.getElementById('stageAspectStatus');
 
   let store = Studio.createStore(Studio.createProject({
     title: '我的 Signal Field 项目',
@@ -96,6 +101,175 @@
   let directionGeneration = 0;
   let selectedTemplate = 'ambient-orbit';
   let selectedAspect = '16:9';
+  let sessionAudioMetadata = null;
+  let restoredBeatEdits = null;
+  let historyEntries = [];
+  let historyIndex = -1;
+  let applyingHistory = false;
+  let productionAudioReady = false;
+
+  function setPreviewAspect(aspect) {
+    if (!previewStage || !['16:9', '9:16', '1:1'].includes(aspect)) return;
+    previewStage.dataset.aspect = aspect;
+    previewStage.setAttribute('aria-label', `视频预览舞台，当前画幅 ${aspect}`);
+    if (previewAspectStatus) previewAspectStatus.textContent = `预览画幅 ${aspect}`;
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+  }
+
+  function updateRenderAvailability() {
+    if (!directorRender) return;
+    const requiresLocalAudio = directorRender.dataset.mode === 'desktop';
+    const unavailable = directorRender.dataset.unavailable === 'true';
+    directorRender.disabled = !productionSpec || unavailable || (requiresLocalAudio && (!musicFile || !productionAudioReady));
+  }
+
+  function currentSessionAudio() {
+    if (!ProductionSession) return null;
+    if (musicFile && musicMeta && (!productionSpec || productionAudioReady)) {
+      try { return ProductionSession.createAudioMetadata(musicFile, musicMeta.durationMs); } catch (_error) {}
+    }
+    return sessionAudioMetadata;
+  }
+
+  function persistProductionSession() {
+    if (!ProductionSession) return;
+    const result = ProductionSession.save(localStorage, {
+      productionSpec,
+      selectedTemplate,
+      selectedAspect,
+      editor: {
+        lyrics: productionSpec ? productionSpec.lyrics : [],
+        manualBeatEdits: productionSpec && editableBeatEdits ? productionSpec.beatEdits : null
+      },
+      audio: currentSessionAudio()
+    });
+    if (result.ok) sessionAudioMetadata = result.session.audio;
+  }
+
+  function historySnapshot() {
+    if (!productionSpec) return null;
+    return {
+      titleTemplate: directorTitleTemplate.value,
+      title: directorTitleText.value,
+      subtitle: directorSubtitleText.value,
+      lyrics: productionSpec.lyrics.map((cue) => ({ ...cue })),
+      beatEdits: productionSpec.beatEdits.map((edit) => ({ ...edit })),
+      manualBeatEdits: Boolean(editableBeatEdits),
+      beatDensity: directorBeatDensity.value
+    };
+  }
+
+  function syncHistoryButtons() {
+    if (directorUndo) directorUndo.disabled = historyIndex <= 0;
+    if (directorRedo) directorRedo.disabled = historyIndex < 0 || historyIndex >= historyEntries.length - 1;
+  }
+
+  function commitHistory() {
+    if (applyingHistory) return;
+    const snapshot = historySnapshot();
+    if (!snapshot) return;
+    const serialized = JSON.stringify(snapshot);
+    if (historyIndex >= 0 && historyEntries[historyIndex].serialized === serialized) return;
+    historyEntries = historyEntries.slice(0, historyIndex + 1);
+    historyEntries.push({ serialized, snapshot });
+    if (historyEntries.length > 50) historyEntries.shift();
+    historyIndex = historyEntries.length - 1;
+    syncHistoryButtons();
+  }
+
+  function applyHistory(index) {
+    if (index < 0 || index >= historyEntries.length || !productionSpec) return;
+    const snapshot = historyEntries[index].snapshot;
+    applyingHistory = true;
+    try {
+      directorTitleTemplate.value = snapshot.titleTemplate;
+      directorTitleText.value = snapshot.title;
+      directorSubtitleText.value = snapshot.subtitle;
+      directorBeatDensity.value = snapshot.beatDensity;
+      parsedLyrics = snapshot.lyrics.map((cue) => ({ ...cue }));
+      editableBeatEdits = snapshot.manualBeatEdits ? snapshot.beatEdits.map((edit) => ({ ...edit })) : null;
+      restoredBeatEdits = snapshot.manualBeatEdits ? null : snapshot.beatEdits.map((edit) => ({ ...edit }));
+      directorLyricsText.value = serializeLyricsForLrc(parsedLyrics);
+      updateProductionSpec();
+      refreshTimelineEditor();
+      historyIndex = index;
+      syncHistoryButtons();
+      setDirectorStatus(index < historyEntries.length - 1 ? '已撤销成片精修。' : '已重做成片精修。');
+    } finally {
+      applyingHistory = false;
+    }
+  }
+
+  function showInvalidSession(error) {
+    if (!directorStatus || !ProductionSession) return;
+    directorStatus.textContent = `自动恢复数据已损坏：${String(error || '无法读取').slice(0, 180)}`;
+    directorStatus.classList.add('error');
+    directorStatus.setAttribute('role', 'alert');
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'inline-recovery';
+    clear.textContent = '清除损坏数据';
+    clear.addEventListener('click', () => {
+      ProductionSession.clear(localStorage);
+      setDirectorStatus('损坏的自动恢复数据已清除；现有场景项目没有被删除。');
+    });
+    directorStatus.appendChild(clear);
+  }
+
+  function restoreProductionSession() {
+    if (!ProductionSession || !directorRoot) return false;
+    const result = ProductionSession.load(localStorage);
+    if (!result.ok) { showInvalidSession(result.error); return false; }
+    if (!result.session) return false;
+    const session = result.session;
+    selectedTemplate = session.selectedTemplate;
+    selectedAspect = session.selectedAspect;
+    sessionAudioMetadata = session.audio;
+    const templateButton = directorTemplates.querySelector(`[data-template="${selectedTemplate}"]`);
+    const aspectButton = directorAspects.querySelector(`[data-aspect="${selectedAspect}"]`);
+    if (templateButton) selectChoice(directorTemplates, templateButton, 'aria-checked');
+    if (aspectButton) selectChoice(directorAspects, aspectButton, 'aria-pressed');
+    setPreviewAspect(selectedAspect);
+    if (!session.productionSpec) {
+      if (session.audio) {
+        directorFileName.textContent = `请重新选择 ${session.audio.name}`;
+        setDirectorStatus('已恢复创作选项；重新选择同一音频后可继续。');
+      }
+      return false;
+    }
+    const project = Studio.createProject(session.productionSpec.project);
+    store.importJSON(Studio.exportProject(project));
+    productionSpec = session.productionSpec;
+    directionPlan = { project: store.getProject(), cues: [] };
+    directionAnalysis = null;
+    parsedLyrics = session.editor.lyrics.map((cue) => ({ ...cue }));
+    editableBeatEdits = session.editor.manualBeatEdits
+      ? session.editor.manualBeatEdits.map((edit) => ({ ...edit }))
+      : null;
+    restoredBeatEdits = session.editor.manualBeatEdits
+      ? null
+      : session.productionSpec.beatEdits.map((edit) => ({ ...edit }));
+    selectedId = project.scenes[0] ? project.scenes[0].id : null;
+    directorTitleTemplate.value = session.productionSpec.titleCard.template;
+    directorTitleText.value = session.productionSpec.titleCard.mainTitle;
+    directorSubtitleText.value = session.productionSpec.titleCard.subtitle;
+    directorLyricsText.value = serializeLyricsForLrc(parsedLyrics);
+    directorFinishing.hidden = false;
+    directorFinishing.open = true;
+    directorExport.disabled = false;
+    directorPreview.disabled = true;
+    directorGenerate.disabled = true;
+    if (session.audio) directorFileName.textContent = `已恢复工程 · 请重新选择 ${session.audio.name}`;
+    persist();
+    renderBeatSummary(session.productionSpec.beatEdits);
+    refreshTimelineEditor();
+    updateRenderAvailability();
+    commitHistory();
+    setDirectorStatus(session.audio
+      ? `已恢复上次工程 · ${project.scenes.length} 个段落；重新选择 ${session.audio.name} 即可继续预览和渲染。`
+      : `已恢复上次工程 · ${project.scenes.length} 个段落；请选择原音频以继续预览和渲染。`);
+    return true;
+  }
 
   function safeLoad() {
     try {
@@ -201,7 +375,9 @@
   }
 
   function beatEditsForCurrentProject() {
-    return editableBeatEdits ? editableBeatEdits.map((edit) => ({ ...edit })) : automaticBeatEditsForCurrentProject();
+    if (editableBeatEdits) return editableBeatEdits.map((edit) => ({ ...edit }));
+    if (!directionAnalysis && restoredBeatEdits) return restoredBeatEdits.map((edit) => ({ ...edit }));
+    return automaticBeatEditsForCurrentProject();
   }
 
   function renderBeatSummary(edits) {
@@ -251,12 +427,13 @@
     if (!directionPlan || !Production) return null;
     try {
       const spec = buildProductionSpec();
-      directorRender.disabled = false;
+      updateRenderAvailability();
       drawProductionOverlay(Number(timeline.value) || 0);
       if (timelineEditor) {
         timelineEditor.setLyrics(spec.lyrics);
         timelineEditor.setBeatEdits(spec.beatEdits);
       }
+      persistProductionSession();
       return spec;
     } catch (error) {
       directorRender.disabled = true;
@@ -673,6 +850,40 @@
     }
   }
 
+  async function hydrateRestoredAudio(file, meta, generation) {
+    const durationMs = productionSpec ? productionSpec.project.timeline.durationMs : meta.durationMs;
+    const pcm = await decodeMusicFile(file, Math.min(meta.durationMs, durationMs), generation);
+    if (generation !== directionGeneration) return;
+    directionAnalysis = Director.analyzeMono(
+      { samples: pcm.samples, sampleRate: pcm.sampleRate },
+      { durationMs: pcm.durationMs, frameRate: 10 }
+    );
+    waveformError = null;
+    waveformData = null;
+    if (TimelineCore) {
+      try {
+        waveformData = TimelineCore.buildWaveform(
+          { samples: pcm.samples, sampleRate: pcm.sampleRate },
+          { bucketCount: Math.min(4096, pcm.samples.length), durationMs: pcm.durationMs }
+        );
+      } catch (error) {
+        waveformError = String(error && error.message || error);
+      }
+      const tempo = directionAnalysis.tempo || {};
+      beatGridMs = tempo.confidence >= 0.25 && tempo.beatMs > 0
+        ? TimelineCore.buildBeatGrid({ durationMs, beatMs: tempo.beatMs })
+        : [];
+    }
+    sessionAudioMetadata = ProductionSession.createAudioMetadata(file, meta.durationMs);
+    productionAudioReady = true;
+    directorPreview.disabled = false;
+    directorGenerate.disabled = false;
+    if (directorLyricsDraft) directorLyricsDraft.disabled = false;
+    refreshTimelineEditor();
+    updateRenderAvailability();
+    persistProductionSession();
+  }
+
   function renderDirectionCues(plan) {
     if (!directorCues) return;
     directorCues.innerHTML = '';
@@ -736,6 +947,9 @@
       productionSpec = null;
       waveformData = nextWaveform;
       editableBeatEdits = null;
+      restoredBeatEdits = null;
+      if (ProductionSession) sessionAudioMetadata = ProductionSession.createAudioMetadata(musicFile, musicMeta.durationMs);
+      productionAudioReady = true;
       beatGridMs = TimelineCore && analysis.tempo.confidence >= 0.25 && analysis.tempo.beatMs > 0
         ? TimelineCore.buildBeatGrid({ durationMs: directionPlan.project.timeline.durationMs, beatMs: analysis.tempo.beatMs })
         : [];
@@ -752,6 +966,9 @@
       directorBeatReset.disabled = true;
       if (directorLyricsDraft) directorLyricsDraft.disabled = false;
       refreshTimelineEditor();
+      historyEntries = [];
+      historyIndex = -1;
+      commitHistory();
       const tempo = analysis.tempo.confidence >= 0.25 ? `${Math.round(analysis.tempo.bpm)} BPM` : '自由节奏';
       setDirectorStatus(`已生成 ${directionPlan.project.scenes.length} 个段落 · ${tempo} · ${selectedAspect} · 可直接预览或继续编辑`);
     } catch (error) {
@@ -769,7 +986,7 @@
         directorGenerate.disabled = !musicFile;
         directorPreview.disabled = !directionPlan;
         directorExport.disabled = !directionPlan;
-        directorRender.disabled = !productionSpec;
+        updateRenderAvailability();
       }
     }
   }
@@ -785,25 +1002,7 @@
   async function selectDirectorFile(file) {
     if (!file) return;
     const token = ++directionGeneration;
-    directionPlan = null;
-    directionAnalysis = null;
-    productionSpec = null;
-    parsedLyrics = [];
-    editableBeatEdits = null;
-    waveformData = null;
-    waveformError = null;
-    beatGridMs = [];
-    if (directorFinishing) directorFinishing.hidden = true;
-    if (directorTimelineEditor) directorTimelineEditor.hidden = true;
-    if (directorLyricsText) directorLyricsText.value = '';
-    if (directorLyricsDraft) directorLyricsDraft.disabled = true;
-    if (directorTitleText) directorTitleText.value = '';
-    if (productionCanvas && ProductionOverlay) ProductionOverlay.clearOverlay(productionCanvas);
-    directorCues.innerHTML = '';
     directorGenerate.disabled = true;
-    directorPreview.disabled = true;
-    directorExport.disabled = true;
-    directorRender.disabled = true;
     directorFileName.textContent = `${file.name} · 正在读取…`;
     setDirectorStatus('正在读取音频元数据；文件不会离开这台设备。');
     try {
@@ -813,12 +1012,30 @@
       musicMeta = Object.assign({ file }, meta);
       directorFileName.textContent = `${meta.name} · ${formatTime(meta.durationMs)}`;
       directorGenerate.disabled = false;
-      setDirectorStatus('音乐已就绪。选择模板和画幅后，点击“分析并生成”。');
+      const matchesRestored = Boolean(productionSpec && sessionAudioMetadata && ProductionSession &&
+        ProductionSession.matchesAudio(sessionAudioMetadata, file, meta.durationMs));
+      if (matchesRestored) {
+        setDirectorStatus('已找到恢复工程对应的音频，正在重建本机波形与节拍分析…');
+        await hydrateRestoredAudio(file, meta, token);
+        if (token !== directionGeneration) return;
+        setDirectorStatus('工程和原音频已重新连接；可继续预览、精修或加入渲染队列。');
+      } else if (productionSpec) {
+        productionAudioReady = false;
+        updateRenderAvailability();
+        setDirectorStatus('所选音频与恢复工程记录不同；原工程仍保留。点击“分析并生成”后才会创建新工程。');
+      } else {
+        if (ProductionSession) sessionAudioMetadata = ProductionSession.createAudioMetadata(file, meta.durationMs);
+        persistProductionSession();
+        setDirectorStatus('音乐已就绪。选择模板和画幅后，点击“分析并生成”。');
+      }
     } catch (_error) {
       if (token !== directionGeneration) return;
-      musicFile = null; musicMeta = null;
-      directorFileName.textContent = '读取失败 · 可重新选择';
-      setDirectorStatus('无法读取这个音频文件，请换用浏览器支持的 MP3、M4A、WAV 或 OGG。', true);
+      if (!productionSpec) { musicFile = null; musicMeta = null; }
+      directorFileName.textContent = productionSpec && sessionAudioMetadata
+        ? `读取失败 · 请重新选择 ${sessionAudioMetadata.name}`
+        : '读取失败 · 可重新选择';
+      updateRenderAvailability();
+      setDirectorStatus('无法读取这个音频文件；原有工程已保留，请换用浏览器支持的 MP3、M4A、WAV 或 OGG。', true);
     } finally {
       directorFileInput.value = '';
     }
@@ -844,6 +1061,7 @@
     parsedLyrics = next;
     try {
       updateProductionSpec();
+      commitHistory();
       directorLyricsStatus.textContent = next.length ? `已读取 ${next.length} 条时间戳歌词。` : '未添加歌词；最终视频只显示标题。';
       directorLyricsStatus.setAttribute('role', 'status');
     } catch (error) {
@@ -866,6 +1084,7 @@
     try {
       updateProductionSpec();
       directorLyricsText.value = serializeLyricsForLrc(parsedLyrics);
+      commitHistory();
       const percent = Math.round(result.diagnostics.confidence * 100);
       directorLyricsStatus.textContent = `已在本机生成 ${parsedLyrics.length} 行时间初稿 · 参考置信度 ${percent}% · 这不是人声识别，请在波形时间轴检查并拖动校正。`;
       directorLyricsStatus.setAttribute('role', 'status');
@@ -911,6 +1130,7 @@
         try {
           updateProductionSpec();
           directorLyricsText.value = serializeLyricsForLrc(parsedLyrics);
+          commitHistory();
           directorLyricsStatus.textContent = `已手动调整 ${parsedLyrics.length} 条歌词时间；结束边界保存在创作方案中。`;
           directorLyricsStatus.setAttribute('role', 'status');
         } catch (error) {
@@ -925,6 +1145,7 @@
         try {
           updateProductionSpec();
           directorBeatReset.disabled = false;
+          commitHistory();
         } catch (error) {
           editableBeatEdits = previous;
           updateProductionSpec();
@@ -936,7 +1157,7 @@
   }
 
   function refreshTimelineEditor() {
-    if (!productionSpec || !directionAnalysis) return;
+    if (!productionSpec) return;
     const editor = mountTimelineEditor();
     if (!editor) return;
     editor.setData({
@@ -964,13 +1185,35 @@
       const percent = Math.round((Number(item.progress) || 0) * 100);
       detail.textContent = `${labels[item.status] || item.status}${item.status === 'running' ? ` · ${percent}%` : ''}${item.error ? ` · ${String(item.error).slice(0, 180)}` : ''}`;
       copy.append(name, detail); card.appendChild(copy);
+      const actions = document.createElement('div');
+      actions.className = 'director-queue-actions';
       if (item.status === 'queued' || item.status === 'running') {
         const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = '取消';
         cancel.addEventListener('click', async () => {
           try { renderQueueTask(await Desktop.cancelRender(item.id)); } catch (error) { directorQueueStatus.textContent = `取消失败：${error.message || error}`; }
         });
-        card.appendChild(cancel);
+        actions.appendChild(cancel);
+      } else if (item.status === 'failed' && typeof Desktop.retryRender === 'function') {
+        const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = '重试';
+        retry.addEventListener('click', async () => {
+          retry.disabled = true;
+          try { renderQueueTask(await Desktop.retryRender(item.id)); } catch (error) {
+            directorQueueStatus.textContent = `重试失败：${error.message || error}`;
+            directorQueueStatus.setAttribute('role', 'alert');
+          } finally { retry.disabled = false; }
+        });
+        actions.appendChild(retry);
+      } else if (item.status === 'completed' && typeof Desktop.revealRender === 'function') {
+        const reveal = document.createElement('button'); reveal.type = 'button'; reveal.textContent = '在 Finder 中显示';
+        reveal.addEventListener('click', async () => {
+          try { await Desktop.revealRender(item.id); } catch (error) {
+            directorQueueStatus.textContent = `无法定位文件：${error.message || error}`;
+            directorQueueStatus.setAttribute('role', 'alert');
+          }
+        });
+        actions.appendChild(reveal);
       }
+      if (actions.children.length) card.appendChild(actions);
       directorQueue.appendChild(card);
     });
     directorQueueStatus.textContent = task.status === 'completed' ? '视频已经生成。' : task.status === 'failed' ? '渲染失败；当前创作方案仍然保留。' : '桌面渲染队列会串行处理任务。';
@@ -1009,6 +1252,25 @@
     directorRenderHint.textContent = desktop
       ? '选择保存位置后加入本机串行队列；关闭网页不会把音乐上传到任何服务器。'
       : '浏览器不会生成 MP4；音频不会打包，请在桌面版重新选择同一文件后渲染。';
+    directorRender.dataset.unavailable = 'false';
+    updateRenderAvailability();
+    if (desktop && typeof Desktop.renderPreflight === 'function') {
+      directorRender.dataset.unavailable = 'true';
+      directorRenderHint.textContent = '正在检查本机 FFmpeg 与 ffprobe…';
+      updateRenderAvailability();
+      Desktop.renderPreflight().then((preflight) => {
+        directorRender.dataset.unavailable = String(!preflight.ok);
+        directorRenderHint.textContent = preflight.ok
+          ? `${preflight.message} 选择保存位置后会加入串行渲染队列。`
+          : preflight.message;
+        if (!preflight.ok) directorQueueStatus.textContent = preflight.message;
+        updateRenderAvailability();
+      }).catch((error) => {
+        directorRender.dataset.unavailable = 'true';
+        directorRenderHint.textContent = `无法检查视频编码器：${error.message || error}`;
+        updateRenderAvailability();
+      });
+    }
     if (desktop && typeof Desktop.listRenders === 'function') {
       Desktop.listRenders().then((tasks) => tasks.forEach(renderQueueTask)).catch(() => {});
       if (typeof Desktop.onRenderQueueChange === 'function') Desktop.onRenderQueueChange(renderQueueTask);
@@ -1033,6 +1295,7 @@
     directorTemplates.addEventListener('click', (event) => {
       const button = event.target.closest('[data-template]'); if (!button) return;
       selectedTemplate = button.dataset.template; selectChoice(directorTemplates, button, 'aria-checked');
+      persistProductionSession();
       if (directionPlan) setDirectorStatus('模板已更改；重新生成后才会替换当前项目。');
     });
     directorTemplates.addEventListener('keydown', (event) => {
@@ -1046,15 +1309,20 @@
     directorAspects.addEventListener('click', (event) => {
       const button = event.target.closest('[data-aspect]'); if (!button) return;
       selectedAspect = button.dataset.aspect; selectChoice(directorAspects, button, 'aria-pressed');
+      setPreviewAspect(selectedAspect);
+      if (!directionPlan) persistProductionSession();
       if (directionPlan) setDirectorStatus('画幅已更改；重新生成后才会替换当前项目。');
     });
     directorGenerate.addEventListener('click', generateDirection);
     directorPreview.addEventListener('click', () => { startPlayback(); });
-    directorTitleTemplate.addEventListener('change', updateProductionSpec);
+    directorTitleTemplate.addEventListener('change', () => { updateProductionSpec(); commitHistory(); });
     directorTitleText.addEventListener('input', updateProductionSpec);
     directorSubtitleText.addEventListener('input', updateProductionSpec);
+    directorTitleText.addEventListener('change', commitHistory);
+    directorSubtitleText.addEventListener('change', commitHistory);
     directorBeatDensity.addEventListener('change', () => {
       updateProductionSpec();
+      commitHistory();
       if (editableBeatEdits) {
         directorBeatReset.disabled = false;
         setDirectorStatus('切换密度不会覆盖手调切点；点击“按当前密度重新生成”才会替换。');
@@ -1062,7 +1330,9 @@
     });
     directorBeatReset.addEventListener('click', () => {
       editableBeatEdits = null;
+      restoredBeatEdits = null;
       updateProductionSpec();
+      commitHistory();
       directorBeatReset.disabled = true;
       if (timelineEditor && productionSpec) timelineEditor.setBeatEdits(productionSpec.beatEdits);
       setDirectorStatus('已按当前密度重新生成节拍切点；原手动位置已被替换。');
@@ -1086,7 +1356,17 @@
     });
     directorLyricsClear.addEventListener('click', () => {
       parsedLyrics = []; directorLyricsText.value = ''; updateProductionSpec();
+      commitHistory();
       directorLyricsStatus.textContent = '歌词已清空；最终视频只显示标题。'; directorLyricsStatus.setAttribute('role', 'status');
+    });
+    directorUndo.addEventListener('click', () => applyHistory(historyIndex - 1));
+    directorRedo.addEventListener('click', () => applyHistory(historyIndex + 1));
+    window.addEventListener('keydown', (event) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLowerCase() !== 'z') return;
+      const active = document.activeElement;
+      if (active && (active.matches('input,textarea,select') || active.isContentEditable)) return;
+      event.preventDefault();
+      applyHistory(historyIndex + (event.shiftKey ? 1 : -1));
     });
     directorRender.addEventListener('click', renderOrDownload);
     directorExport.addEventListener('click', () => {
@@ -1106,6 +1386,7 @@
   }
 
   safeLoad();
+  restoreProductionSession();
   render();
   if (store.getProject().scenes.length) setStatus(`已恢复本机项目 · ${store.getProject().scenes.length} 个场景`);
 

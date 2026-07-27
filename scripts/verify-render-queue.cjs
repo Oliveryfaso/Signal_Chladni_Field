@@ -6,7 +6,14 @@ const { EventEmitter } = require('node:events');
 const SceneStudio = require('../app/scene-studio.js');
 const ProductionSpec = require('../app/production-spec.js');
 const ExportVideo = require('./export-video.cjs');
-const { createRenderQueue, taskArguments, validateTaskInput } = require('../desktop/render-queue.cjs');
+const {
+  RENDER_WORKER_FLAG,
+  createRenderQueue,
+  extractRenderWorkerArguments,
+  renderWorkerLaunch,
+  taskArguments,
+  validateTaskInput
+} = require('../desktop/render-queue.cjs');
 
 function flush() {
   return new Promise((resolve) => setImmediate(resolve));
@@ -47,8 +54,10 @@ async function run() {
     const project = validProject(directory);
     const audio = path.join(directory, 'song.wav');
     const exporter = path.join(directory, 'export-video.cjs');
+    const bootstrap = path.join(directory, 'bootstrap.cjs');
     fs.writeFileSync(audio, Buffer.from('RIFF-test-audio'));
     fs.writeFileSync(exporter, '// mock exporter');
+    fs.writeFileSync(bootstrap, '// mock bootstrap');
     const production = path.join(directory, 'production.json');
     fs.writeFileSync(production, ProductionSpec.export(ProductionSpec.create({
       project: SceneStudio.importProject(fs.readFileSync(project, 'utf8')),
@@ -93,6 +102,25 @@ async function run() {
       '--output', path.join(directory, 'production.mp4'),
       '--audio', audio
     ]);
+    assert.equal(extractRenderWorkerArguments(['bootstrap.cjs', '--smoke']), null);
+    assert.deepEqual(
+      extractRenderWorkerArguments(['bootstrap.cjs', RENDER_WORKER_FLAG, '--production', production]),
+      ['--production', production]
+    );
+    assert.deepEqual(
+      renderWorkerLaunch({ electronPath: '/mock/electron', bootstrapScript: bootstrap, isPackaged: false }, normalized),
+      {
+        command: '/mock/electron',
+        args: [bootstrap, RENDER_WORKER_FLAG, ...taskArguments(normalized)]
+      }
+    );
+    assert.deepEqual(
+      renderWorkerLaunch({ electronPath: '/Applications/Signal Field.app/Contents/MacOS/Signal Field', isPackaged: true }, productionTask),
+      {
+        command: '/Applications/Signal Field.app/Contents/MacOS/Signal Field',
+        args: [RENDER_WORKER_FLAG, ...taskArguments(productionTask)]
+      }
+    );
     const productionExport = ExportVideo.loadOptions(taskArguments(productionTask));
     assert.equal(productionExport.production.schema, ProductionSpec.SCHEMA);
     assert.equal(productionExport.aspect, '9:16');
@@ -114,6 +142,7 @@ async function run() {
     const queue = createRenderQueue({
       root: directory,
       exportScript: exporter,
+      bootstrapScript: bootstrap,
       electronPath: '/mock/electron',
       makeId: () => `task-${++id}`,
       spawn: (command, args, options) => {
@@ -135,8 +164,10 @@ async function run() {
     assert.equal(spawnCalls.length, 1, 'queue must execute only one child at a time');
     assert.equal(spawnCalls[0].command, '/mock/electron');
     assert.equal(spawnCalls[0].options.shell, false);
-    assert.equal(spawnCalls[0].args[0], exporter);
+    assert.equal(spawnCalls[0].args[0], bootstrap);
+    assert.equal(spawnCalls[0].args[1], RENDER_WORKER_FLAG);
     assert.ok(spawnCalls[0].args.includes(project));
+    assert.equal(spawnCalls[0].options.cwd, directory);
     children[0].stdout.emit('data', Buffer.from('Rendered 25/100 frames\n'));
     assert.equal(queue.list()[0].progress, 0.25);
     assert.equal(queue.list()[0].renderedFrames, 25);
@@ -166,6 +197,16 @@ async function run() {
     await flush();
     assert.equal(queue.list().find((task) => task.id === third.id).status, 'failed');
     assert.match(queue.list().find((task) => task.id === third.id).error, /encoder failed/);
+    assert.throws(() => queue.retry(first.id), /only a failed/);
+    const retried = queue.retry(third.id);
+    assert.notEqual(retried.id, third.id);
+    assert.equal(retried.output, third.output);
+    await flush();
+    assert.equal(spawnCalls.length, 4);
+    fs.writeFileSync(path.join(directory, 'third.mp4'), 'retried-render');
+    children[3].emit('close', 0, null);
+    await flush();
+    assert.equal(queue.list().find((task) => task.id === retried.id).status, 'completed');
 
     const listed = queue.list();
     listed[0].status = 'tampered';
@@ -173,7 +214,7 @@ async function run() {
     assert.ok(events.some((task) => task.status === 'running' && task.progress === 0.25));
     unsubscribe();
     queue.shutdown();
-    console.log('PASS strict render queue validation, serial execution, progress, cancellation, failure, and shell-free spawn');
+    console.log('PASS strict render queue validation, packaged/development worker launch, serial execution, progress, cancellation, failure retry, and shell-free spawn');
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }

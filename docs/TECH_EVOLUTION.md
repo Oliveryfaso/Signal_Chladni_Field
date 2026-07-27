@@ -1,5 +1,13 @@
 # Technical evolution
 
+## 2026-07-27 — Production-grade Creator recovery and packaged render dispatch
+
+- Added a strict bounded Production session that stores the canonical project, title, lyrics, beat edits, choices, and allowlisted audio identity metadata without file paths, media bytes, PCM, Blob, or waveform caches.
+- Restored sessions reopen in their true output aspect and require explicit matching-audio reselection before synchronized desktop rendering. Matching audio rebuilds local waveform/tempo analysis while preserving editorial state.
+- Added bounded finishing undo/redo, safe invalid-session clearing, desktop FFmpeg/ffprobe preflight, failed-job retry, completed-output Finder reveal, and responsive queue actions.
+- Added a bootstrap entry that dispatches the same render worker from development Electron and packaged `.app` executables before the normal desktop main process loads.
+- Added package-worker, recovery, aspect, mobile-overflow, and queue-retry verification. macOS release builds on filesystems that create AppleDouble `._app.asar` files must use an APFS/internal working copy before artifact verification.
+
 ## 2026-07-23 — Deterministic local plain-text lyric timing
 
 - Added a dependency-free lyric timing module that converts one-line-per-cue plain text into ordered, non-overlapping Production Spec lyric ranges using the existing local music analysis.

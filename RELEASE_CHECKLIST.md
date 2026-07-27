@@ -27,8 +27,10 @@
 
 ## Desktop
 
-- [ ] Run `npm run smoke` and `npm run verify:mac-parity`.
-- [ ] Build the macOS package and confirm the bundled app does not contain the Web demo MP3.
+- [ ] Run `npm run check`, `npm run verify:pages`, `npm run verify:web-audio`, `npm run smoke`, `npm run verify:mac-parity`, and `npm run verify:video-export-smoke`.
+- [ ] Build the macOS package from APFS/internal storage, confirm it does not contain the removed Web demo MP3, and run `npm run verify:packaged-render-worker -- "/path/to/Signal Field.app" --encode`.
+- [ ] Launch the app as a Finder user and confirm the Creator detects FFmpeg/ffprobe (including Homebrew paths), disables rendering with actionable copy when unavailable, retries a failed job, and reveals a completed output without accepting a renderer-supplied path.
+- [ ] Reload a finished Creator project and confirm title, lyrics, beats, aspect, and undo/redo state remain while synchronized preview/render require same-audio reselection.
 - [ ] Open the packaged Mac and Windows apps and verify their display name, About window, icon, installer name, screen saver name, and lock launcher name read “Signal Field”.
 - [ ] Configure production signing and notarization before distributing installers.
 

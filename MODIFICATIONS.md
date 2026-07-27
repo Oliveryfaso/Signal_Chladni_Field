@@ -16,6 +16,8 @@ Each human-authored inherited implementation and documentation file listed below
 - A creator-first Music Video Director with local audio analysis, three automatic direction templates, three output aspects, audio-clock timeline preview, editable project export, and project-driven H.264/ProRes CLI rendering.
 - A strict Production Spec, four title treatments, timestamped LRC subtitles, three beat-cut densities, shared preview/export Canvas compositor, dedicated desktop Creator window, native-save render queue, and real FFmpeg production smoke.
 - A bounded local waveform timeline with a shared audio playhead, fit/zoom navigation, constrained pointer/keyboard lyric ranges, beat-grid snapping, and canonical manual edit persistence.
+- A bounded local Production-session recovery layer with strict audio-identity metadata, same-file reconnection, true-aspect preview, finishing undo/redo, invalid-session recovery, and no persisted media bytes or paths.
+- A packaged/development Electron render bootstrap, encoder preflight, failed-job retry, completed-output Finder reveal, and install-artifact worker verification.
 - Local data-field import, multi-signal mapping, anomaly event bookmarks, deterministic scene recipes, and sample data.
 - The keyboard-accessible interactive resonance laboratory.
 - Versioned Scene Studio projects, scene CRUD/reordering, interpolated timelines, safe import/export, and local project persistence.

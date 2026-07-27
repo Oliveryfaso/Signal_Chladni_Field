@@ -3,6 +3,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
 const { fileURLToPath } = require('node:url');
+const { spawnSync } = require('node:child_process');
 const { createRenderQueue } = require('./render-queue.cjs');
 const ProductionSpec = require('../app/production-spec.js');
 const {
@@ -27,8 +28,8 @@ const APP_ICON_FILE = path.join(__dirname, 'assets', 'signal-field-icon.png');
 const IS_SMOKE = process.argv.includes('--smoke');
 const APP_NAME = 'Signal Field';
 const RENDER_QUEUE_EVENT = 'sound-motion:render-queue-changed';
-const renderQueue = createRenderQueue({ root: ROOT_DIR });
-const TERMINAL_RENDER_STATUSES = new Set(['completed', 'failed', 'cancelled']);
+const renderQueue = createRenderQueue({ root: ROOT_DIR, isPackaged: app.isPackaged });
+const CLEANUP_RENDER_STATUSES = new Set(['completed', 'cancelled']);
 const MAX_PRODUCTION_JSON_BYTES = 6 * 1024 * 1024;
 
 let controllerWindow = null;
@@ -73,7 +74,7 @@ function requireTrustedDesktopSender(event) {
 }
 
 function broadcastRenderQueueChange(task) {
-  if (task.production && TERMINAL_RENDER_STATUSES.has(task.status)) cleanupManagedProductionFile(task.production);
+  if (task.production && CLEANUP_RENDER_STATUSES.has(task.status)) cleanupManagedProductionFile(task.production);
   for (const window of [controllerWindow, visualizerWindow, creatorWindow]) {
     if (!window || window.isDestroyed() || window.webContents.isLoading()) continue;
     if (!trustedDesktopContents(window.webContents, window.webContents.getURL())) continue;
@@ -102,6 +103,71 @@ function cleanupRenderTempDirectory() {
   if (!renderTempDirectory) return;
   try { fs.rmSync(renderTempDirectory, { recursive: true, force: true }); } catch (_error) {}
   renderTempDirectory = null;
+}
+
+function renderBinaryStatus(binary) {
+  const result = spawnSync(binary, ['-version'], {
+    encoding: 'utf8',
+    timeout: 5000,
+    windowsHide: true,
+    maxBuffer: 1024 * 1024
+  });
+  return {
+    binary,
+    ok: !result.error && result.status === 0,
+    error: result.error ? String(result.error.message || result.error).slice(0, 240) : null
+  };
+}
+
+function firstAvailableRenderBinary(candidates) {
+  const unique = Array.from(new Set(candidates.filter(Boolean)));
+  for (const binary of unique) {
+    const status = renderBinaryStatus(binary);
+    if (status.ok) return status;
+  }
+  return { binary: unique[0] || '', ok: false, error: null };
+}
+
+function renderPreflight() {
+  const executable = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+  const probeExecutable = process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe';
+  const encoder = firstAvailableRenderBinary([
+    process.env.FFMPEG_PATH,
+    process.platform === 'darwin' ? `/opt/homebrew/bin/${executable}` : null,
+    process.platform === 'darwin' ? `/usr/local/bin/${executable}` : null,
+    executable
+  ]);
+  const inferredProbe = encoder.ok && path.isAbsolute(encoder.binary)
+    ? path.join(path.dirname(encoder.binary), probeExecutable)
+    : probeExecutable;
+  const probe = firstAvailableRenderBinary([
+    process.env.FFPROBE_PATH,
+    inferredProbe,
+    process.platform === 'darwin' ? `/opt/homebrew/bin/${probeExecutable}` : null,
+    process.platform === 'darwin' ? `/usr/local/bin/${probeExecutable}` : null,
+    probeExecutable
+  ]);
+  const ok = encoder.ok && probe.ok;
+  if (ok) {
+    process.env.FFMPEG_PATH = encoder.binary;
+    process.env.FFPROBE_PATH = probe.binary;
+  }
+  return {
+    ok,
+    packaged: app.isPackaged,
+    ffmpeg: { ok: encoder.ok, binary: encoder.binary },
+    ffprobe: { ok: probe.ok, binary: probe.binary },
+    message: ok
+      ? '本机视频编码器已就绪。'
+      : '桌面视频导出需要 FFmpeg 和 ffprobe。请安装 FFmpeg，或在启动应用前设置 FFMPEG_PATH 与 FFPROBE_PATH。'
+  };
+}
+
+function requireRenderTask(id) {
+  if (typeof id !== 'string' || !id || id.length > 128) throw new Error('render task id is invalid');
+  const task = renderQueue.list().find((candidate) => candidate.id === id);
+  if (!task) throw new Error('render task was not found');
+  return task;
 }
 
 // On macOS, Screen Recording permission can be denied after Chromium has
@@ -1070,6 +1136,28 @@ ipcMain.handle('sound-motion:render-queue-list', (event) => {
 ipcMain.handle('sound-motion:render-queue-cancel', (event, id) => {
   requireTrustedDesktopSender(event);
   return renderQueue.cancel(id);
+});
+
+ipcMain.handle('sound-motion:render-preflight', (event) => {
+  requireTrustedDesktopSender(event);
+  return renderPreflight();
+});
+
+ipcMain.handle('sound-motion:render-queue-retry', (event, id) => {
+  requireTrustedDesktopSender(event);
+  requireRenderTask(id);
+  return renderQueue.retry(id);
+});
+
+ipcMain.handle('sound-motion:render-queue-reveal', (event, id) => {
+  requireTrustedDesktopSender(event);
+  const task = requireRenderTask(id);
+  if (task.status !== 'completed') throw new Error('only a completed render can be shown');
+  let stat;
+  try { stat = fs.statSync(task.output); } catch (_error) { throw new Error('rendered output is unavailable'); }
+  if (!stat.isFile() || stat.size <= 0) throw new Error('rendered output is unavailable');
+  shell.showItemInFolder(task.output);
+  return true;
 });
 
 ipcMain.on('sound-motion:visualizer-command', (_event, command) => {

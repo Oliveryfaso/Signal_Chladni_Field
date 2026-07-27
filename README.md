@@ -51,8 +51,8 @@ Each mode remembers its adjusted detail value for the current session. Particle 
 2. Choose **Ambient Orbit**, **Pulse Cut**, or **Sand Study**, then select `16:9`, `9:16`, or `1:1` and a full/short duration.
 3. Select **Analyze and generate**. Signal Field estimates energy, spectral balance, changes, tempo, and song sections, then creates a validated Scene Studio timeline.
 4. Open **Finish the video** to choose Minimal, Cinematic, Kinetic, or no opening title; create a local timing draft from one-line-per-cue plain text or import timestamped LRC lyrics; and choose relaxed, balanced, or punchy beat cuts. The draft is not speech recognition and should be reviewed on the waveform.
-5. Use the bounded waveform timeline to seek, zoom, and move lyric edges or beat points with pointer or keyboard. Manual beats stay in place until the explicit regenerate action.
-6. Preview the same title/lyric/beat compositor used by final export. On the Web, download the validated Production Spec. In the desktop Creator, choose **Render video** to select an output location and add the job to the local queue.
+5. Use the bounded waveform timeline to seek, zoom, and move lyric edges or beat points with pointer or keyboard. Manual beats stay in place until the explicit regenerate action. Creator finishing actions support bounded undo/redo.
+6. Preview the same title/lyric/beat compositor used by final export in the actual `16:9`, `9:16`, or `1:1` frame. The production session is saved locally; after a reload, reselect the matching audio file to reconnect waveform, preview, and export without storing audio bytes or paths. On the Web, download the validated Production Spec. In the desktop Creator, choose **Render video** to select an output location and add the job to the local queue.
 
 The desktop Creator provides the one-click path. The equivalent CLI accepts either a Production Spec or the earlier scene project:
 
@@ -61,7 +61,7 @@ npm run export:video -- --production signal-field-production.json --audio song.m
   --aspect 9:16 --output signal-field-video.mp4
 ```
 
-The queue reports waiting, frame progress, completion, failure, and cancellation. The CLI produces H.264 MP4 by default or ProRes MOV when the output ends in `.mov`. Browser export produces the Production Spec, not a fake encoded video; audio is never bundled in that JSON. Deterministic video export uses the complete Canvas renderer and does not include the additive WebGPU enhancement.
+The desktop preflight checks FFmpeg and ffprobe before enabling video output. The queue reports waiting, frame progress, completion, failure, cancellation, failed-job retry, and Finder reveal. The CLI produces H.264 MP4 by default or ProRes MOV when the output ends in `.mov`. Browser export produces the Production Spec, not a fake encoded video; audio is never bundled in that JSON. Deterministic video export uses the complete Canvas renderer and does not include the additive WebGPU enhancement.
 
 ## Web Creator and Advanced Workspace
 
@@ -139,6 +139,8 @@ Build an unpacked macOS application with:
 npm run package:mac
 ```
 
+Video encoding currently requires `ffmpeg` and `ffprobe` on the destination Mac, or explicit `FFMPEG_PATH` and `FFPROBE_PATH` environment variables. The app performs this check before enabling one-click rendering. Verify dispatch and a real encoded frame with `npm run verify:packaged-render-worker -- "/path/to/Signal Field.app" --encode`. Signing and notarization still require the publisher's Apple Developer identity. When building from a non-APFS external drive that creates AppleDouble `._app.asar` files, build from an APFS working copy such as `/private/tmp` and copy the finished artifact back.
+
 See [README.txt](README.txt) for screen saver and lock-launcher build, installation, and macOS system limitations.
 
 ## Windows Contributors
@@ -160,6 +162,7 @@ app/index.html              Particle physics, audio analysis, and Canvas renderi
 app/music-director.js       Local music feature analysis and deterministic automatic direction plans
 app/lyric-timing.js         Review-required local line timing drafts from plain-text lyrics
 app/production-spec.js      Validated project/title/LRC/beat/output production envelope
+app/production-session.js   Bounded crash recovery and audio re-selection identity
 app/production-overlay.js   Shared title, lyric, accent, and hold Canvas compositor
 app/timeline-editor-core.js Bounded waveform, coordinate, lyric, and beat edit core
 app/waveform-timeline.js    Responsive Canvas waveform and accessible timing controls
@@ -172,7 +175,8 @@ app/webgpu-particle-backend.js WGSL compute/render, ping-pong buffers, and 64K/1
 app/webgpu-integration.js    Runtime bridge between the Canvas visual and WebGPU enhancement layer
 scripts/verify-webgpu-integration.cjs Shape/force bridge integration verification
 scripts/export-video.cjs    Project/audio/aspect-driven deterministic H.264 and ProRes export
-desktop/render-queue.cjs    Serial local render jobs, progress, cancellation, and failure state
+desktop/bootstrap.cjs       Development/packaged render-worker dispatch before desktop UI startup
+desktop/render-queue.cjs    Serial local render jobs, progress, cancellation, retry, and failure state
 desktop/                    Electron main process, controls, and system-audio bridge
 macos-screensaver/          Native Metal screen saver
 scripts/build-pages.sh      Minimal static publishing artifact
